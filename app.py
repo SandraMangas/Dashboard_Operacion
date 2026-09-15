@@ -1138,7 +1138,8 @@ def dashboard(
         tarjeta_kpi(
             "CD",
             f"{total_cd:,}",
-             "blue",
+            "",
+            "blue",
         )
 
     with kpi_2:
