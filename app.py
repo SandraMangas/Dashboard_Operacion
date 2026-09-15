@@ -588,7 +588,8 @@ def clasificar_visitas(
         .dt.normalize()
     )
 
-    hoy = pd.Timestamp.now(ZoneInfo("America/Bogota")).normalize()
+    # Obtenemos la hora de Colombia sin zona horaria para evitar errores de comparación con pandas
+    hoy = pd.Timestamp.now(ZoneInfo("America/Bogota")).normalize().tz_localize(None)
 
     resultado["_ESTADO_VISITA"] = (
         "Sin fecha"
