@@ -1167,7 +1167,7 @@ def dashboard(
         tarjeta_kpi(
             "Próximos a vencer",
             f"{proximos_n:,}",
-            "operativos",
+            "",
             "amber",
         )
 
@@ -1207,7 +1207,7 @@ def dashboard(
             (
                 f"{calcular_porcentaje(ejecutables_n, total_registros):.1f}%"
             ),
-            f"{ejecutables_n:,} casos",
+            f"{ejecutables_n:,}",
             "teal",
         )
 
@@ -1218,7 +1218,7 @@ def dashboard(
             (
                 f"{calcular_porcentaje(no_ejecutables_n, total_registros):.1f}%"
             ),
-            f"{no_ejecutables_n:,} casos",
+            f"{no_ejecutables_n:,}",
             "red",
         )
 
@@ -1227,7 +1227,7 @@ def dashboard(
         tarjeta_kpi(
             "Escalados a proyectos",
             f"{escalados_n:,}",
-            "fuera de alerta operativa",
+            "Fuera de alerta operativa",
             "amber",
         )
 
