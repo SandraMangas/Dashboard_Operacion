@@ -350,12 +350,7 @@ def cargar_roadmap() -> pd.DataFrame:
                     "la información del dashboard."
                 ),
             )
-
-        st.caption(
-            "La aplicación conserva el último archivo "
-            "cargado para abrirlo automáticamente."
-        )
-
+       
     # ========================================================
     # NUEVO ARCHIVO
     # ========================================================
