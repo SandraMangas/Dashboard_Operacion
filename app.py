@@ -458,8 +458,7 @@ def mostrar_reloj() -> None:
     ahora = datetime.now(ZoneInfo("America/Bogota"))
 
     st.caption(
-        f":material/schedule: "
-        f"Actualizado (Hora Colombia): "
+        f":material/schedule: "        
         f"**{ahora:%d/%m/%Y · %I:%M %p}**"
     )
 
