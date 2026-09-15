@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from io import BytesIO
 from pathlib import Path
 import os
@@ -454,11 +455,11 @@ def cargar_roadmap() -> pd.DataFrame:
 
 def mostrar_reloj() -> None:
 
-    ahora = datetime.now().astimezone()
+    ahora = datetime.now(ZoneInfo("America/Bogota"))
 
     st.caption(
         f":material/schedule: "
-        f"Actualizado desde el equipo: "
+        f"Actualizado (Hora Colombia): "
         f"**{ahora:%d/%m/%Y · %I:%M %p}**"
     )
 
@@ -587,7 +588,7 @@ def clasificar_visitas(
         .dt.normalize()
     )
 
-    hoy = pd.Timestamp.now().normalize()
+    hoy = pd.Timestamp.now(ZoneInfo("America/Bogota")).normalize()
 
     resultado["_ESTADO_VISITA"] = (
         "Sin fecha"
