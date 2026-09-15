@@ -29,7 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent
 TESERACT_LOGO = (
     BASE_DIR
     / "assets"
-    / "Logo_Teseract.jpeg"
+    / "Logo_Teseract.jpg"
 )
 
 ARCHIVO_GUARDADO = (
