@@ -1147,7 +1147,7 @@ def dashboard(
         tarjeta_kpi(
             "PQRSD",
             f"{int(total_pqrs):,}",
-            "carga de casos",
+            "",
             "blue",
         )
 
@@ -1158,7 +1158,7 @@ def dashboard(
             (
                 f"{calcular_porcentaje(vencidos_n, total_registros):.1f}%"
             ),
-            f"{vencidos_n:,} operativos",
+            f"{vencidos_n:,}",
             "red",
         )
 
