@@ -62,10 +62,6 @@ st.markdown(
     """
     <style>
 
-      /* =====================================================
-         HEADER
-         ===================================================== */
-
       .st-key-executive_header {
           background: #17365D;
           padding: 18px 22px 16px;
@@ -100,14 +96,38 @@ st.markdown(
           text-align: right;
       }
 
-      /* =====================================================
-         KPI
-         ===================================================== */
+      .gerencial-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 7px 12px;
+          border-radius: 999px;
+          font-size: .74rem;
+          font-weight: 800;
+          line-height: 1.1;
+          margin: 0 0 5px auto;
+          white-space: nowrap;
+      }
+
+      .gerencial-pill--red {
+          background: #FCE1E1;
+          color: #B42318;
+      }
+
+      .gerencial-pill--orange {
+          background: #FFF1D6;
+          color: #A86B00;
+      }
+
+      .gerencial-pill--green {
+          background: #DDF3E4;
+          color: #167A3B;
+      }
 
       .kpi-card {
-          min-height: 82px;
-          height: 82px;
-          padding: 9px 12px;
+          min-height: 90px;
+          height: 90px;
+          padding: 10px 12px;
           border-radius: 10px;
           border: 1px solid #D8E1EA;
           border-top: 4px solid #3D6E9E;
@@ -138,7 +158,7 @@ st.markdown(
       .kpi-label {
           display: block;
           color: #5B6776;
-          font-size: 0.64rem;
+          font-size: 0.72rem;
           font-weight: 700;
           letter-spacing: .035em;
           text-transform: uppercase;
@@ -150,9 +170,9 @@ st.markdown(
 
       .kpi-value {
           display: block;
-          margin-top: 5px;
+          margin-top: 6px;
           color: #17365D;
-          font-size: 1.32rem;
+          font-size: 1.65rem;
           font-weight: 750;
           line-height: 1;
           text-align: center;
@@ -160,9 +180,9 @@ st.markdown(
 
       .kpi-detail {
           display: block;
-          margin-top: 5px;
+          margin-top: 6px;
           color: #5B6776;
-          font-size: .70rem;
+          font-size: .76rem;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -171,6 +191,19 @@ st.markdown(
 
       .dashboard-space {
           height: 7px;
+      }
+
+      .dataframe-title {
+          color: #17365D;
+          font-size: 1.00rem;
+          font-weight: 750;
+          margin: 0 0 6px 0;
+      }
+
+      .dataframe-caption {
+          color: #5B6776;
+          font-size: .68rem;
+          margin-bottom: 8px;
       }
 
     </style>
@@ -187,25 +220,23 @@ def columna(
     df: pd.DataFrame,
     nombre: str,
 ) -> pd.Series:
-    """Devuelve la serie de una columna o una serie vacía."""
-
     if nombre in df.columns:
         return df[nombre]
 
-    return pd.Series(dtype="object")
+    return pd.Series(
+        dtype="object",
+        index=df.index,
+    )
 
 
 def limpiar_texto(
     serie: pd.Series,
 ) -> pd.Series:
-    """Normaliza textos para evitar problemas con vacíos y espacios."""
-
     return (
         serie
-        .fillna("Sin información")
+        .fillna("")
         .astype(str)
         .str.strip()
-        .replace("", "Sin información")
     )
 
 
@@ -213,29 +244,17 @@ def buscar_columna(
     df: pd.DataFrame,
     candidatos: list[str],
 ) -> str | None:
-    """
-    Busca primero coincidencia exacta y luego parcial.
-    """
 
     columnas = {
         str(col).strip().upper(): col
         for col in df.columns
     }
 
-    # --------------------------------------------------------
-    # COINCIDENCIA EXACTA
-    # --------------------------------------------------------
-
     for candidato in candidatos:
-
         clave = candidato.strip().upper()
 
         if clave in columnas:
             return columnas[clave]
-
-    # --------------------------------------------------------
-    # COINCIDENCIA PARCIAL
-    # --------------------------------------------------------
 
     for clave, original in columnas.items():
 
@@ -255,7 +274,6 @@ def calcular_porcentaje(
     valor: int | float,
     total: int,
 ) -> float:
-    """Calcula un porcentaje evitando división por cero."""
 
     if total == 0:
         return 0.0
@@ -271,9 +289,6 @@ def calcular_porcentaje(
 def cargar_datos(
     file_bytes: bytes,
 ) -> pd.DataFrame:
-    """
-    Lee la hoja RoadMap del archivo Excel.
-    """
 
     return pd.read_excel(
         BytesIO(file_bytes),
@@ -286,24 +301,20 @@ def cargar_datos(
 # ============================================================
 
 def cargar_roadmap() -> pd.DataFrame:
-    """
-    Si existe archivo_actual.xlsx, lo carga automáticamente.
-
-    Si el usuario selecciona un nuevo archivo (solo local):
-    - se guarda como archivo_actual.xlsx
-    - se limpia la caché
-    - se carga la nueva versión
-    """
 
     ARCHIVO_GUARDADO.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    # Detección de entorno (Producción en Streamlit Cloud o Local)
     es_produccion = (
-        st.secrets.get("modo_produccion", False) 
-        or os.getenv("STREAMLIT_SHARING_MODE") is not None
+        st.secrets.get(
+            "modo_produccion",
+            False,
+        )
+        or os.getenv(
+            "STREAMLIT_SHARING_MODE"
+        ) is not None
     )
 
     archivo_nuevo = None
@@ -315,10 +326,6 @@ def cargar_roadmap() -> pd.DataFrame:
             icon=":material/tune:",
         )
 
-        # ----------------------------------------------------
-        # ESTADO DEL ARCHIVO
-        # ----------------------------------------------------
-
         if ARCHIVO_GUARDADO.exists():
 
             st.success(
@@ -327,7 +334,8 @@ def cargar_roadmap() -> pd.DataFrame:
             )
 
             st.caption(
-                f"Fuente actual: **{ARCHIVO_GUARDADO.name}**"
+                f"Fuente actual: "
+                f"**{ARCHIVO_GUARDADO.name}**"
             )
 
         else:
@@ -337,28 +345,23 @@ def cargar_roadmap() -> pd.DataFrame:
                 icon=":material/info:",
             )
 
-        # ----------------------------------------------------
-        # ACTUALIZAR ARCHIVO (Solo visible en entorno local)
-        # ----------------------------------------------------
-
         if not es_produccion:
+
             archivo_nuevo = st.file_uploader(
                 "Actualizar archivo",
                 type=["xlsx", "xls"],
                 key="roadmap_file",
                 help=(
-                    "Selecciona un nuevo Excel para actualizar "
-                    "la información del dashboard."
+                    "Selecciona un nuevo Excel para "
+                    "actualizar la información."
                 ),
             )
-       
-    # ========================================================
-    # NUEVO ARCHIVO
-    # ========================================================
 
     if archivo_nuevo is not None:
 
-        nuevos_bytes = archivo_nuevo.getvalue()
+        nuevos_bytes = (
+            archivo_nuevo.getvalue()
+        )
 
         ARCHIVO_GUARDADO.write_bytes(
             nuevos_bytes
@@ -373,10 +376,6 @@ def cargar_roadmap() -> pd.DataFrame:
             .copy()
         )
 
-    # ========================================================
-    # ARCHIVO EXISTENTE
-    # ========================================================
-
     elif ARCHIVO_GUARDADO.exists():
 
         datos = (
@@ -390,16 +389,27 @@ def cargar_roadmap() -> pd.DataFrame:
 
         return pd.DataFrame()
 
-    # ========================================================
-    # FILTROS
-    # ========================================================
-
     filtros = [
-        ("ALIADOS", "Aliado"),
-        ("DEPARTAMENTO", "Departamento"),
-        ("PRIORIDAD", "Prioridad"),
-        ("ESTADO PQRS CON PDR", "Estado PQRS"),
-        ("VIABILIDAD DE MTTO", "Viabilidad"),
+        (
+            "ALIADOS",
+            "Aliado",
+        ),
+        (
+            "DEPARTAMENTO",
+            "Departamento",
+        ),
+        (
+            "PRIORIDAD",
+            "Prioridad",
+        ),
+        (
+            "ESTADO PQRS CON PDR",
+            "Estado PQRS",
+        ),
+        (
+            "VIABILIDAD DE MTTO",
+            "Viabilidad",
+        ),
     ]
 
     with st.sidebar:
@@ -427,9 +437,10 @@ def cargar_roadmap() -> pd.DataFrame:
                 .tolist()
             )
 
-            opciones = [
-                "Todos"
-            ] + sorted(opciones)
+            opciones = (
+                ["Todos"]
+                + sorted(opciones)
+            )
 
             elegido = st.selectbox(
                 etiqueta,
@@ -455,15 +466,19 @@ def cargar_roadmap() -> pd.DataFrame:
 
 def mostrar_reloj() -> None:
 
-    ahora = datetime.now(ZoneInfo("America/Bogota"))
+    ahora = datetime.now(
+        ZoneInfo("America/Bogota")
+    )
 
     st.caption(
-        f":material/schedule: "        
+        ":material/schedule: "
         f"**{ahora:%d/%m/%Y · %I:%M %p}**"
     )
 
 
-@st.fragment(run_every="60s")
+@st.fragment(
+    run_every="60s"
+)
 def reloj_actualizable() -> None:
 
     mostrar_reloj()
@@ -504,14 +519,29 @@ def figura_base(
     )
 
     fig.update_xaxes(
-        showgrid=True,
-        gridcolor="#E7EDF3",
+        showgrid=False,
+        showticklabels=False,
         zeroline=False,
+        title_text="",
     )
 
     fig.update_yaxes(
         showgrid=False,
+        showticklabels=True,
         zeroline=False,
+        title_text="",
+    )
+
+    try:
+        fig.update_layout(
+            barcornerradius="50%",
+            bargap=0.28,
+        )
+    except Exception:
+        pass
+
+    fig.update_traces(
+        marker_line_width=0,
     )
 
     return fig
@@ -547,84 +577,38 @@ def tarjeta_kpi(
 def clasificar_visitas(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Clasifica las visitas según la fecha disponible.
-
-    Valores:
-    - Sin fecha
-    - Visita vencida
-    - Visita hoy
-    - Visita programada
-    - Visita programada - caso vencido
-    """
 
     resultado = df.copy()
 
-    col_fecha = buscar_columna(
+    col_fecha_visita = buscar_columna(
         resultado,
         [
-            "FECHA VISITA",
             "FECHA DE VISITA",
-            "FECHA PROGRAMADA",
-            "PROGRAMACION VISITA",
-            "PROGRAMACIÓN VISITA",
+            "FECHA VISITA",
         ],
     )
 
-    if col_fecha is None:
-
-        resultado["_ESTADO_VISITA"] = (
-            "Sin fecha"
-        )
-
-        return resultado
-
-    fechas = (
-        pd.to_datetime(
-            resultado[col_fecha],
-            errors="coerce",
-        )
-        .dt.normalize()
+    col_fecha_max_atencion = buscar_columna(
+        resultado,
+        [
+            "NUEVA FECHA MÁXIMA ATENCIÓN",
+            "NUEVA FECHA MAXIMA ATENCION",
+        ],
     )
 
-    # Obtenemos la hora de Colombia sin zona horaria para evitar errores de comparación con pandas
-    hoy = pd.Timestamp.now(ZoneInfo("America/Bogota")).normalize().tz_localize(None)
-
-    resultado["_ESTADO_VISITA"] = (
-        "Sin fecha"
+    col_novedad = buscar_columna(
+        resultado,
+        [
+            "NOVEDAD",
+        ],
     )
 
-    # --------------------------------------------------------
-    # VISITA VENCIDA
-    # --------------------------------------------------------
-
-    resultado.loc[
-        fechas.notna()
-        & (fechas < hoy),
-        "_ESTADO_VISITA",
-    ] = "Visita vencida"
-
-    # --------------------------------------------------------
-    # VISITA HOY
-    # --------------------------------------------------------
-
-    resultado.loc[
-        fechas == hoy,
-        "_ESTADO_VISITA",
-    ] = "Visita hoy"
-
-    # --------------------------------------------------------
-    # VISITA PROGRAMADA
-    # --------------------------------------------------------
-
-    resultado.loc[
-        fechas > hoy,
-        "_ESTADO_VISITA",
-    ] = "Visita programada"
-
-    # --------------------------------------------------------
-    # CASO VENCIDO + VISITA FUTURA
-    # --------------------------------------------------------
+    col_estado = buscar_columna(
+        resultado,
+        [
+            "ESTADO",
+        ],
+    )
 
     col_estado_pqrs = buscar_columna(
         resultado,
@@ -635,31 +619,218 @@ def clasificar_visitas(
         ],
     )
 
+    hoy = pd.Timestamp(
+        datetime.now(
+            ZoneInfo("America/Bogota")
+        ).date()
+    )
+
+    if col_fecha_visita is not None:
+
+        fecha_visita = pd.to_datetime(
+            resultado[col_fecha_visita],
+            errors="coerce",
+            dayfirst=True,
+        ).dt.normalize()
+
+    else:
+
+        fecha_visita = pd.Series(
+            pd.NaT,
+            index=resultado.index,
+        )
+
+    if col_fecha_max_atencion is not None:
+
+        fecha_max_atencion = pd.to_datetime(
+            resultado[
+                col_fecha_max_atencion
+            ],
+            errors="coerce",
+            dayfirst=True,
+        ).dt.normalize()
+
+    else:
+
+        fecha_max_atencion = pd.Series(
+            pd.NaT,
+            index=resultado.index,
+        )
+
+    completar_fecha_visita = (
+        fecha_visita.isna()
+        & fecha_max_atencion.notna()
+    )
+
+    if col_fecha_visita is not None:
+
+        resultado.loc[
+            completar_fecha_visita,
+            col_fecha_visita,
+        ] = fecha_max_atencion.loc[
+            completar_fecha_visita
+        ]
+
+        fecha_visita = pd.to_datetime(
+            resultado[
+                col_fecha_visita
+            ],
+            errors="coerce",
+            dayfirst=True,
+        ).dt.normalize()
+
+    if col_novedad is not None:
+
+        novedad = (
+            resultado[
+                col_novedad
+            ]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+        tiene_novedad = (
+            novedad.ne("")
+            & novedad.str.upper().ne("NAN")
+            & novedad.str.upper().ne(
+                "SIN INFORMACIÓN"
+            )
+        )
+
+    else:
+
+        tiene_novedad = pd.Series(
+            False,
+            index=resultado.index,
+        )
+
+    resultado["_BLOQUEADO"] = (
+        tiene_novedad
+    )
+
+    if col_estado is not None:
+
+        estado_gestion = (
+            resultado[
+                col_estado
+            ]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
+    else:
+
+        estado_gestion = pd.Series(
+            "",
+            index=resultado.index,
+        )
+
+    escalado_proyectos = (
+        estado_gestion.str.contains(
+            "PROYECT",
+            na=False,
+        )
+    )
+
+    gestion_operativa = (
+        estado_gestion.eq("")
+    )
+
+    resultado[
+        "_ESCALADO_PROYECTOS"
+    ] = escalado_proyectos
+
+    resultado[
+        "_GESTION_OPERATIVA"
+    ] = gestion_operativa
+
+    fecha_efectiva = (
+        fecha_visita
+        .combine_first(
+            fecha_max_atencion
+        )
+    )
+
+    resultado[
+        "_FECHA_EFECTIVA_VISITA"
+    ] = fecha_efectiva
+
     if col_estado_pqrs is not None:
 
-        estados_pqrs = (
+        estado_pqrs = (
             limpiar_texto(
-                resultado[col_estado_pqrs]
+                resultado[
+                    col_estado_pqrs
+                ]
             )
             .str.upper()
         )
 
-        caso_vencido = (
-            estados_pqrs == "VENCIDO"
+    else:
+
+        estado_pqrs = pd.Series(
+            "",
+            index=resultado.index,
         )
 
-        visita_programada = (
-            resultado["_ESTADO_VISITA"]
-            == "Visita programada"
-        )
+    resultado[
+        "ESTADO VISITA"
+    ] = "Sin fecha de visita"
 
-        resultado.loc[
-            caso_vencido
-            & visita_programada,
-            "_ESTADO_VISITA",
-        ] = (
-            "Visita programada - caso vencido"
-        )
+    resultado.loc[
+        escalado_proyectos,
+        "ESTADO VISITA",
+    ] = "Escalado a proyectos"
+
+    visita_vencida = (
+        fecha_efectiva.notna()
+        & (fecha_efectiva < hoy)
+        & gestion_operativa
+    )
+
+    resultado.loc[
+        visita_vencida,
+        "ESTADO VISITA",
+    ] = "Visita vencida"
+
+    visita_hoy = (
+        fecha_efectiva.notna()
+        & (fecha_efectiva == hoy)
+        & gestion_operativa
+    )
+
+    resultado.loc[
+        visita_hoy,
+        "ESTADO VISITA",
+    ] = "Visita hoy"
+
+    visita_programada = (
+        fecha_efectiva.notna()
+        & (fecha_efectiva > hoy)
+        & gestion_operativa
+    )
+
+    resultado.loc[
+        visita_programada,
+        "ESTADO VISITA",
+    ] = "Visita programada"
+
+    visita_programada_pqr_vencida = (
+        fecha_efectiva.notna()
+        & (fecha_efectiva > hoy)
+        & estado_pqrs.eq("VENCIDO")
+        & gestion_operativa
+    )
+
+    resultado.loc[
+        visita_programada_pqr_vencida,
+        "ESTADO VISITA",
+    ] = (
+        "Visita programada - PQRSD Vencida"
+    )
 
     return resultado
 
@@ -671,13 +842,6 @@ def clasificar_visitas(
 def mascara_escalado_proyectos(
     df: pd.DataFrame,
 ) -> pd.Series:
-    """
-    Identifica los casos escalados a proyectos
-    a partir de la columna ESTADO.
-
-    Se considera escalado cuando ESTADO contiene
-    la palabra PROYECT.
-    """
 
     if "ESTADO" not in df.columns:
 
@@ -687,9 +851,10 @@ def mascara_escalado_proyectos(
         )
 
     estados = (
-        limpiar_texto(
-            df["ESTADO"]
-        )
+        df["ESTADO"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
         .str.upper()
     )
 
@@ -702,16 +867,15 @@ def mascara_escalado_proyectos(
 def contar_escalados_proyectos(
     df: pd.DataFrame,
 ) -> tuple[int, str | None]:
-    """
-    Cuenta casos escalados a proyectos.
-    """
 
     if "ESTADO" not in df.columns:
 
         return 0, None
 
-    mascara = mascara_escalado_proyectos(
-        df
+    mascara = (
+        mascara_escalado_proyectos(
+            df
+        )
     )
 
     return (
@@ -727,23 +891,6 @@ def contar_escalados_proyectos(
 def calcular_estado_gerencial(
     df: pd.DataFrame,
 ) -> dict:
-    """
-    Determina el semáforo gerencial.
-
-    Regla:
-
-    🔴 REQUIERE ATENCIÓN
-       Hay vencidos NO escalados a proyectos.
-
-    🟠 ATENCIÓN PREVENTIVA
-       No hay vencidos operativos, pero sí próximos
-       a vencer NO escalados a proyectos.
-
-    🟢 OPERACIÓN CONTROLADA
-       No hay vencidos ni próximos a vencer operativos.
-
-    Los casos escalados a proyectos NO generan alerta.
-    """
 
     estado_pqrs = (
         columna(
@@ -756,24 +903,76 @@ def calcular_estado_gerencial(
         .str.strip()
     )
 
+    if "ESTADO" in df.columns:
+
+        estado = (
+            df["ESTADO"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
+    else:
+
+        estado = pd.Series(
+            "",
+            index=df.index,
+        )
+
     escalado_proyectos = (
-        mascara_escalado_proyectos(
-            df
+        estado.str.contains(
+            "PROYECT",
+            na=False,
         )
     )
 
-    # --------------------------------------------------------
-    # VENCIDOS OPERATIVOS
-    # --------------------------------------------------------
-
-    vencidos_operativos = (
-        estado_pqrs.eq("VENCIDO")
-        & ~escalado_proyectos
+    gestion_operativa = (
+        estado.eq("")
     )
 
     # --------------------------------------------------------
-    # PRÓXIMOS A VENCER OPERATIVOS
+    # PRIORIDAD 1 Y 2
     # --------------------------------------------------------
+
+    prioridad = (
+        columna(
+            df,
+            "PRIORIDAD",
+        )
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    prioridad_normalizada = (
+        prioridad
+        .str.replace("Á", "A", regex=False)
+        .str.replace("É", "E", regex=False)
+        .str.replace("Í", "I", regex=False)
+        .str.replace("Ó", "O", regex=False)
+        .str.replace("Ú", "U", regex=False)
+        .str.replace(" ", "", regex=False)
+    )
+
+    prioridad_critica = prioridad_normalizada.isin(
+        [
+            "1",
+            "2",
+            "P1",
+            "P2",
+            "PRIORIDAD1",
+            "PRIORIDAD2",
+        ]
+    )
+
+    vencidos_operativos = (
+        estado_pqrs.eq("VENCIDO")
+        & gestion_operativa
+        & ~escalado_proyectos
+        & prioridad_critica
+    )
 
     proximos_operativos = (
         estado_pqrs.isin(
@@ -782,7 +981,9 @@ def calcular_estado_gerencial(
                 "PROXIMO A VENCER",
             ]
         )
+        & gestion_operativa
         & ~escalado_proyectos
+        & prioridad_critica
     )
 
     vencidos_n = int(
@@ -797,54 +998,89 @@ def calcular_estado_gerencial(
         escalado_proyectos.sum()
     )
 
-    # --------------------------------------------------------
-    # SEMÁFORO
-    # --------------------------------------------------------
+    estado_visita = columna(
+        df,
+        "ESTADO VISITA",
+    )
+
+    sin_fecha_n = int(
+        (
+            gestion_operativa
+            & estado_visita.eq(
+                "Sin fecha de visita"
+            )
+        ).sum()
+    )
 
     if vencidos_n > 0:
 
-        estado = {
-            "texto": "Estado: requiere atención",
-            "icono": ":material/warning:",
-            "color": "red",
-            "detalle": (
-                f"{vencidos_n:,} "
-                f"vencidos operativos"
-            ),
+        estado_resultado = {
+            "texto":
+                "Estado: requiere atención",
+            "icono":
+                ":material/warning:",
+            "color":
+                "red",
+            "detalle":
+                (
+                    f"{vencidos_n:,} "
+                    "vencidos P1/P2 operativos"
+                ),
         }
 
     elif proximos_n > 0:
 
-        estado = {
-            "texto": "Estado: atención preventiva",
-            "icono": ":material/priority_high:",
-            "color": "orange",
-            "detalle": (
-                f"{proximos_n:,} "
-                f"próximos a vencer operativos"
-            ),
+        estado_resultado = {
+            "texto":
+                "Estado: atención preventiva",
+            "icono":
+                ":material/priority_high:",
+            "color":
+                "orange",
+            "detalle":
+                (
+                    f"{proximos_n:,} "
+                    "próximos P1/P2 operativos"
+                ),
         }
 
     else:
 
-        estado = {
-            "texto": "Estado: operación controlada",
-            "icono": ":material/check_circle:",
-            "color": "green",
-            "detalle": (
-                "Sin vencidos ni próximos a vencer "
-                "operativos"
-            ),
+        estado_resultado = {
+            "texto":
+                "Estado: operación controlada",
+            "icono":
+                ":material/check_circle:",
+            "color":
+                "green",
+            "detalle":
+                (
+                    "Sin vencidos ni próximos "
+                    "a vencer P1/P2 operativos"
+                ),
         }
 
     return {
-        "vencidos_operativos": vencidos_operativos,
-        "proximos_operativos": proximos_operativos,
-        "escalado_proyectos": escalado_proyectos,
-        "vencidos_n": vencidos_n,
-        "proximos_n": proximos_n,
-        "escalados_n": escalados_n,
-        "estado": estado,
+        "vencidos_operativos":
+            vencidos_operativos,
+        "proximos_operativos":
+            proximos_operativos,
+        "escalado_proyectos":
+            escalado_proyectos,
+        "gestion_operativa":
+            gestion_operativa,
+        "prioridad_critica":
+            prioridad_critica,
+        "vencidos_n":
+            vencidos_n,
+        "proximos_n":
+            proximos_n,
+        "escalados_n":
+            escalados_n,
+        "sin_fecha_n":
+            sin_fecha_n,
+        "estado":
+            estado_resultado,
     }
 
 
@@ -867,10 +1103,6 @@ def mostrar_cabecera(
             vertical_alignment="center",
         )
 
-        # ----------------------------------------------------
-        # LOGO
-        # ----------------------------------------------------
-
         with logo:
 
             if TESERACT_LOGO.exists():
@@ -879,10 +1111,6 @@ def mostrar_cabecera(
                     TESERACT_LOGO,
                     width=150,
                 )
-
-        # ----------------------------------------------------
-        # TÍTULO
-        # ----------------------------------------------------
 
         with texto:
 
@@ -902,20 +1130,33 @@ def mostrar_cabecera(
                 unsafe_allow_html=True,
             )
 
-        # ----------------------------------------------------
-        # SEMÁFORO GERENCIAL
-        # ----------------------------------------------------
-
         with estado:
 
             estado_info = (
-                estado_gerencial["estado"]
+                estado_gerencial[
+                    "estado"
+                ]
             )
 
-            st.badge(
-                estado_info["texto"],
-                icon=estado_info["icono"],
-                color=estado_info["color"],
+            clase_semaforo = {
+                "red": "gerencial-pill--red",
+                "orange": "gerencial-pill--orange",
+                "green": "gerencial-pill--green",
+            }.get(
+                estado_info["color"],
+                "gerencial-pill--green",
+            )
+
+            icono_semaforo = "●"
+
+            st.markdown(
+                f"""
+                <div class="gerencial-pill {clase_semaforo}">
+                    <span>{icono_semaforo}</span>
+                    <span>{estado_info["texto"]}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
             st.markdown(
@@ -926,10 +1167,6 @@ def mostrar_cabecera(
                 """,
                 unsafe_allow_html=True,
             )
-
-            # ------------------------------------------------
-            # INFORMACIÓN DE ESCALADOS
-            # ------------------------------------------------
 
             escalados_n = (
                 estado_gerencial[
@@ -942,14 +1179,82 @@ def mostrar_cabecera(
                 st.markdown(
                     f"""
                     <div class="header-status-detail">
-                        {escalados_n:,} escalados a proyectos
+                        {escalados_n:,}
+                        escalados a proyectos
                         · fuera de alerta operativa
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
+            sin_fecha_n = (
+                estado_gerencial[
+                    "sin_fecha_n"
+                ]
+            )
+
+            if sin_fecha_n > 0:
+
+                st.markdown(
+                    f"""
+                    <div class="header-status-detail">
+                        {sin_fecha_n:,}
+                        sin fecha de visita
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
             reloj_actualizable()
+
+
+# ============================================================
+# ESTILO ESTADO PQRSD
+# ============================================================
+
+def estilo_estado_pqrs(
+    valor,
+):
+    valor_normalizado = (
+        str(valor)
+        .replace("●", "")
+        .strip()
+        .upper()
+    )
+
+    if "VIGENTE" in valor_normalizado:
+        return (
+            "background-color: #DDF3E4; "
+            "color: #167A3B; "
+            "font-weight: 800; "
+            "text-align: center; "
+            "border-radius: 999px; "
+        )
+
+    if (
+        "PRÓXIMO A VENCER"
+        in valor_normalizado
+        or "PROXIMO A VENCER"
+        in valor_normalizado
+    ):
+        return (
+            "background-color: #FFF1D6; "
+            "color: #A86B00; "
+            "font-weight: 800; "
+            "text-align: center; "
+            "border-radius: 999px; "
+        )
+
+    if "VENCIDO" in valor_normalizado:
+        return (
+            "background-color: #FCE1E1; "
+            "color: #B42318; "
+            "font-weight: 800; "
+            "text-align: center; "
+            "border-radius: 999px; "
+        )
+
+    return ""
 
 
 # ============================================================
@@ -960,19 +1265,11 @@ def dashboard(
     df: pd.DataFrame,
 ) -> None:
 
-    # --------------------------------------------------------
-    # PREPARACIÓN
-    # --------------------------------------------------------
-
     df = clasificar_visitas(
         df
     )
 
     total_registros = len(df)
-
-    # --------------------------------------------------------
-    # ESTADO PQRSD
-    # --------------------------------------------------------
 
     estado_pqrs = (
         columna(
@@ -984,10 +1281,6 @@ def dashboard(
         .str.strip()
     )
 
-    # --------------------------------------------------------
-    # VIABILIDAD
-    # --------------------------------------------------------
-
     viabilidad = (
         columna(
             df,
@@ -997,10 +1290,6 @@ def dashboard(
         .astype(str)
         .str.strip()
     )
-
-    # --------------------------------------------------------
-    # ESTADO GERENCIAL
-    # --------------------------------------------------------
 
     estado_gerencial = (
         calcular_estado_gerencial(
@@ -1026,9 +1315,11 @@ def dashboard(
         ]
     )
 
-    # --------------------------------------------------------
-    # MÉTRICAS GENERALES
-    # --------------------------------------------------------
+    prioridad_critica = (
+        estado_gerencial[
+            "prioridad_critica"
+        ]
+    )
 
     ejecutables_n = int(
         viabilidad
@@ -1044,29 +1335,18 @@ def dashboard(
         .sum()
     )
 
-    # --------------------------------------------------------
-    # CD
-    # --------------------------------------------------------
-
     id_beneficiario = columna(
         df,
         "ID BENEFICIARIO",
     )
 
     if id_beneficiario.empty:
-
         total_cd = total_registros
-
     else:
-
         total_cd = (
             id_beneficiario
             .nunique()
         )
-
-    # --------------------------------------------------------
-    # PQRSD
-    # --------------------------------------------------------
 
     pqrs = columna(
         df,
@@ -1089,6 +1369,44 @@ def dashboard(
         total_pqrs = total_registros
 
     # ========================================================
+    # VISITAS PRÓXIMOS 7 DÍAS
+    # ========================================================
+
+    hoy = pd.Timestamp(
+        datetime.now(
+            ZoneInfo("America/Bogota")
+        ).date()
+    )
+
+    fecha_efectiva = columna(
+        df,
+        "_FECHA_EFECTIVA_VISITA",
+    )
+
+    ejecutable_mask = (
+        viabilidad
+        .str.upper()
+        .eq("EJECUTABLE")
+    )
+
+    visitas_7_dias_mask = (
+        ejecutable_mask
+        & fecha_efectiva.notna()
+        & (
+            fecha_efectiva
+            .between(
+                hoy,
+                hoy + pd.Timedelta(days=6),
+                inclusive="both",
+            )
+        )
+    )
+
+    visitas_7_dias_n = int(
+        visitas_7_dias_mask.sum()
+    )
+
+    # ========================================================
     # HEADER
     # ========================================================
 
@@ -1104,10 +1422,6 @@ def dashboard(
         "Indicadores clave",
         icon=":material/query_stats:",
     )
-
-    # --------------------------------------------------------
-    # FILA 1
-    # --------------------------------------------------------
 
     (
         margen_izq,
@@ -1156,9 +1470,12 @@ def dashboard(
         tarjeta_kpi(
             "Vencidos",
             (
-                f"{calcular_porcentaje(vencidos_n, total_registros):.1f}%"
+                f"{calcular_porcentaje(
+                    vencidos_n,
+                    total_registros,
+                ):.1f}%"
             ),
-            f"{vencidos_n:,}",
+            f"{vencidos_n:,} · P1/P2",
             "red",
         )
 
@@ -1166,8 +1483,13 @@ def dashboard(
 
         tarjeta_kpi(
             "Próximos a vencer",
-            f"{proximos_n:,}",
-            "",
+            (
+                f"{calcular_porcentaje(
+                    proximos_n,
+                    total_registros,
+                ):.1f}%"
+            ),
+            f"{proximos_n:,} · P1/P2",
             "amber",
         )
 
@@ -1176,10 +1498,6 @@ def dashboard(
         unsafe_allow_html=True,
     )
 
-    # --------------------------------------------------------
-    # FILA 2
-    # --------------------------------------------------------
-
     (
         margen_izq,
         kpi_5,
@@ -1187,16 +1505,20 @@ def dashboard(
         kpi_6,
         sep_2,
         kpi_7,
+        sep_3,
+        kpi_8,
         margen_der,
     ) = st.columns(
         [
-            0.75,
+            0.35,
             1,
             0.10,
             1,
             0.10,
             1,
-            0.75,
+            0.10,
+            1,
+            0.35,
         ]
     )
 
@@ -1205,7 +1527,10 @@ def dashboard(
         tarjeta_kpi(
             "Ejecutables",
             (
-                f"{calcular_porcentaje(ejecutables_n, total_registros):.1f}%"
+                f"{calcular_porcentaje(
+                    ejecutables_n,
+                    total_registros,
+                ):.1f}%"
             ),
             f"{ejecutables_n:,}",
             "teal",
@@ -1216,7 +1541,10 @@ def dashboard(
         tarjeta_kpi(
             "No ejecutables",
             (
-                f"{calcular_porcentaje(no_ejecutables_n, total_registros):.1f}%"
+                f"{calcular_porcentaje(
+                    no_ejecutables_n,
+                    total_registros,
+                ):.1f}%"
             ),
             f"{no_ejecutables_n:,}",
             "red",
@@ -1229,6 +1557,15 @@ def dashboard(
             f"{escalados_n:,}",
             "Fuera de alerta operativa",
             "amber",
+        )
+
+    with kpi_8:
+
+        tarjeta_kpi(
+            "Visitas próximos 7 días",
+            f"{visitas_7_dias_n:,}",
+            "Ejecutables con visita",
+            "blue",
         )
 
     # ========================================================
@@ -1257,8 +1594,8 @@ def dashboard(
 
             st.write(
                 f"**{vencidos_n:,}** "
-                f"casos vencidos operativos requieren "
-                f"priorización."
+                "casos P1/P2 vencidos "
+                "operativos requieren priorización."
             )
 
         else:
@@ -1268,7 +1605,7 @@ def dashboard(
             )
 
             st.write(
-                "No existen casos vencidos "
+                "No existen casos P1/P2 vencidos "
                 "operativos."
             )
 
@@ -1284,7 +1621,8 @@ def dashboard(
 
             st.write(
                 f"**{proximos_n:,}** "
-                f"casos operativos están próximos a vencer."
+                "casos P1/P2 operativos están "
+                "próximos a vencer."
             )
 
         else:
@@ -1294,8 +1632,8 @@ def dashboard(
             )
 
             st.write(
-                "No existen casos próximos a vencer "
-                "operativos."
+                "No existen casos P1/P2 próximos "
+                "a vencer operativos."
             )
 
     with alertas[2].container(
@@ -1308,26 +1646,18 @@ def dashboard(
 
         st.write(
             f"**{escalados_n:,}** "
-            f"casos escalados a proyectos "
-            f"se gestionan fuera de la alerta operativa."
+            "casos escalados a proyectos "
+            "se gestionan fuera de la "
+            "alerta operativa."
         )
 
     # ========================================================
     # ESTADO PQRSD + VIABILIDAD
     # ========================================================
 
-    izquierda, derecha = st.columns(
-        2,
-        gap="medium",
-    )
+    izquierda, derecha = st.columns(2, gap="medium")
 
-    # --------------------------------------------------------
-    # ESTADO PQRSD
-    # --------------------------------------------------------
-
-    with izquierda.container(
-        border=True,
-    ):
+    with izquierda.container(border=True):
 
         st.subheader(
             "Estado de PQRSD",
@@ -1342,10 +1672,14 @@ def dashboard(
                 hole=0.62,
                 color="ESTADO PQRS CON PDR",
                 color_discrete_map={
-                    "VIGENTE": PALETTE["teal"],
-                    "PRÓXIMO A VENCER": PALETTE["amber"],
-                    "PROXIMO A VENCER": PALETTE["amber"],
-                    "VENCIDO": PALETTE["red"],
+                    "VIGENTE":
+                        PALETTE["teal"],
+                    "PRÓXIMO A VENCER":
+                        PALETTE["amber"],
+                    "PROXIMO A VENCER":
+                        PALETTE["amber"],
+                    "VENCIDO":
+                        PALETTE["red"],
                 },
             )
 
@@ -1357,16 +1691,11 @@ def dashboard(
         else:
 
             st.info(
-                "No se encontró la columna de estado PQRSD."
+                "No se encontró la columna "
+                "de estado PQRSD."
             )
 
-    # --------------------------------------------------------
-    # VIABILIDAD
-    # --------------------------------------------------------
-
-    with derecha.container(
-        border=True,
-    ):
+    with derecha.container(border=True):
 
         st.subheader(
             "Viabilidad de mantenimiento",
@@ -1381,8 +1710,10 @@ def dashboard(
                 hole=0.62,
                 color="VIABILIDAD DE MTTO",
                 color_discrete_map={
-                    "EJECUTABLE": PALETTE["teal"],
-                    "NO EJECUTABLE": PALETTE["red"],
+                    "EJECUTABLE":
+                        PALETTE["teal"],
+                    "NO EJECUTABLE":
+                        PALETTE["red"],
                 },
             )
 
@@ -1394,168 +1725,20 @@ def dashboard(
         else:
 
             st.info(
-                "No se encontró la columna de viabilidad."
+                "No se encontró la columna "
+                "de viabilidad."
             )
 
     # ========================================================
-    # ACCIÓN + VISITAS
+    # PQRDS POR DEPARTAMENTO + BLOQUEOS
     # ========================================================
 
-    izquierda, derecha = st.columns(
-        2,
-        gap="medium",
-    )
+    izquierda, derecha = st.columns(2, gap="medium")
 
-    # --------------------------------------------------------
-    # ACCIÓN REQUERIDA
-    # --------------------------------------------------------
-
-    with izquierda.container(
-        border=True,
-    ):
+    with izquierda.container(border=True):
 
         st.subheader(
-            "Acción requerida",
-            icon=":material/task_alt:",
-        )
-
-        col_accion = buscar_columna(
-            df,
-            [
-                "ACCIÓN",
-                "ACCION",
-                "ACCIÓN REQUERIDA",
-                "ACCION REQUERIDA",
-            ],
-        )
-
-        if col_accion:
-
-            acciones = limpiar_texto(
-                df[col_accion]
-            )
-
-            resumen_accion = (
-                acciones
-                .value_counts()
-                .sort_values()
-                .reset_index()
-            )
-
-            resumen_accion.columns = [
-                "Acción",
-                "Casos",
-            ]
-
-            fig = px.bar(
-                resumen_accion,
-                x="Casos",
-                y="Acción",
-                orientation="h",
-                text="Casos",
-                color_discrete_sequence=[
-                    PALETTE["blue"]
-                ],
-            )
-
-            fig.update_traces(
-                textposition="outside",
-                cliponaxis=False,
-            )
-
-            st.plotly_chart(
-                figura_base(
-                    fig,
-                    max(
-                        290,
-                        len(resumen_accion) * 42,
-                    ),
-                ),
-                width="stretch",
-            )
-
-        else:
-
-            st.info(
-                "No se encontró la columna ACCIÓN."
-            )
-
-    # --------------------------------------------------------
-    # PROGRAMACIÓN DE VISITAS
-    # --------------------------------------------------------
-
-    with derecha.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Programación de visitas",
-            icon=":material/event_available:",
-        )
-
-        visitas = (
-            df["_ESTADO_VISITA"]
-            .value_counts()
-            .sort_values()
-            .reset_index()
-        )
-
-        visitas.columns = [
-            "Estado",
-            "Casos",
-        ]
-
-        fig = px.bar(
-            visitas,
-            x="Casos",
-            y="Estado",
-            orientation="h",
-            text="Casos",
-            color="Estado",
-            color_discrete_map={
-                "Visita vencida": PALETTE["red"],
-                "Visita hoy": PALETTE["amber"],
-                "Visita programada": PALETTE["teal"],
-                "Visita programada - caso vencido": PALETTE["red"],
-                "Sin fecha": PALETTE["slate"],
-            },
-        )
-
-        fig.update_traces(
-            textposition="outside",
-            cliponaxis=False,
-        )
-
-        st.plotly_chart(
-            figura_base(
-                fig,
-                max(
-                    290,
-                    len(visitas) * 45,
-                ),
-            ),
-            width="stretch",
-        )
-
-    # ========================================================
-    # DEPARTAMENTO + BLOQUEOS
-    # ========================================================
-
-    izquierda, derecha = st.columns(
-        2,
-        gap="medium",
-    )
-
-    # --------------------------------------------------------
-    # DEPARTAMENTO
-    # --------------------------------------------------------
-
-    with izquierda.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Casos por departamento",
+            "PQRDS por departamento",
             icon=":material/location_on:",
         )
 
@@ -1563,9 +1746,15 @@ def dashboard(
 
             resumen = (
                 df["DEPARTAMENTO"]
-                .fillna("Sin departamento")
+                .fillna(
+                    "Sin departamento"
+                )
                 .astype(str)
                 .str.strip()
+                .replace(
+                    "",
+                    "Sin departamento",
+                )
                 .value_counts()
                 .head(10)
                 .sort_values()
@@ -1601,19 +1790,14 @@ def dashboard(
         else:
 
             st.info(
-                "No se encontró la columna de departamento."
+                "No se encontró la columna "
+                "de departamento."
             )
 
-    # --------------------------------------------------------
-    # BLOQUEOS
-    # --------------------------------------------------------
-
-    with derecha.container(
-        border=True,
-    ):
+    with derecha.container(border=True):
 
         st.subheader(
-            "Principales bloqueos",
+            "Bloqueos",
             icon=":material/block:",
         )
 
@@ -1660,7 +1844,8 @@ def dashboard(
             if resumen.empty:
 
                 st.success(
-                    "No hay bloqueos en los filtros seleccionados."
+                    "No hay bloqueos en los "
+                    "filtros seleccionados."
                 )
 
             else:
@@ -1694,6 +1879,468 @@ def dashboard(
             )
 
     # ========================================================
+    # SITIOS ESCALADOS + ACCIÓN REQUERIDA
+    # ========================================================
+
+    izquierda, derecha = st.columns(2, gap="medium")
+
+    with izquierda.container(border=True):
+
+        st.subheader(
+            "Sitios escalados a proyectos por departamento",
+            icon=":material/account_tree:",
+        )
+
+        col_departamento_escalado = buscar_columna(
+            df,
+            [
+                "DEPARTAMENTO",
+            ],
+        )
+
+        col_sitio_escalado = buscar_columna(
+            df,
+            [
+                "ID BENEFICIARIO",
+                "ID SITIO",
+                "ID CD",
+            ],
+        )
+
+        escalados = mascara_escalado_proyectos(df)
+
+        if (
+            col_departamento_escalado is not None
+            and col_sitio_escalado is not None
+        ):
+
+            datos_escalados = df.loc[
+                escalados,
+                [
+                    col_departamento_escalado,
+                    col_sitio_escalado,
+                ],
+            ].copy()
+
+            datos_escalados.columns = [
+                "Departamento",
+                "Sitio",
+            ]
+
+            datos_escalados["Departamento"] = (
+                datos_escalados["Departamento"]
+                .fillna("Sin departamento")
+                .astype(str)
+                .str.strip()
+                .replace("", "Sin departamento")
+            )
+
+            datos_escalados["Sitio"] = (
+                datos_escalados["Sitio"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+            )
+
+            datos_escalados = datos_escalados[
+                datos_escalados["Sitio"].ne("")
+                & datos_escalados["Sitio"].str.upper().ne("NAN")
+            ]
+
+            resumen_escalados = (
+                datos_escalados
+                .drop_duplicates(
+                    subset=["Departamento", "Sitio"]
+                )
+                .groupby(
+                    "Departamento",
+                    as_index=False,
+                )["Sitio"]
+                .nunique()
+                .rename(
+                    columns={
+                        "Sitio": "Sitios"
+                    }
+                )
+                .sort_values(
+                    "Sitios"
+                )
+            )
+
+            total_sitios_escalados = int(
+                datos_escalados["Sitio"].nunique()
+            )
+
+            if resumen_escalados.empty:
+
+                st.info(
+                    "No hay sitios escalados a proyectos "
+                    "en los filtros seleccionados."
+                )
+
+            else:
+
+                fig = px.bar(
+                    resumen_escalados,
+                    x="Sitios",
+                    y="Departamento",
+                    orientation="h",
+                    text="Sitios",
+                    color_discrete_sequence=[
+                        PALETTE["blue"]
+                    ],
+                )
+
+                fig.update_traces(
+                    textposition="outside",
+                    cliponaxis=False,
+                )
+
+                st.plotly_chart(
+                    figura_base(
+                        fig,
+                        max(
+                            250,
+                            len(resumen_escalados) * 38,
+                        ),
+                    ),
+                    width="stretch",
+                )
+
+                st.caption(
+                    f"Total sitios únicos escalados a proyectos: "
+                    f"{total_sitios_escalados:,}"
+                )
+
+        else:
+
+            st.info(
+                "No se encontraron las columnas "
+                "DEPARTAMENTO e ID del sitio."
+            )
+
+    with derecha.container(border=True):
+
+        st.subheader(
+            "Acción requerida",
+            icon=":material/task_alt:",
+        )
+
+        col_accion = buscar_columna(
+            df,
+            [
+                "ACCIÓN",
+                "ACCION",
+                "ACCIÓN REQUERIDA",
+                "ACCION REQUERIDA",
+            ],
+        )
+
+        if col_accion:
+
+            acciones = limpiar_texto(
+                df[col_accion]
+            )
+
+            acciones = acciones.replace(
+                "",
+                "Sin información",
+            )
+
+            resumen_accion = (
+                acciones
+                .value_counts()
+                .sort_values()
+                .reset_index()
+            )
+
+            resumen_accion.columns = [
+                "Acción",
+                "Casos",
+            ]
+
+            fig = px.bar(
+                resumen_accion,
+                x="Casos",
+                y="Acción",
+                orientation="h",
+                text="Casos",
+                color_discrete_sequence=[
+                    PALETTE["blue"]
+                ],
+            )
+
+            fig.update_traces(
+                textposition="outside",
+                cliponaxis=False,
+            )
+
+            st.plotly_chart(
+                figura_base(
+                    fig,
+                    max(
+                        220,
+                        min(
+                            360,
+                            len(resumen_accion) * 32,
+                        ),
+                    ),
+                ),
+                width="stretch",
+            )
+
+        else:
+
+            st.info(
+                "No se encontró la columna ACCIÓN."
+            )
+
+    # ========================================================
+    # PROGRAMACIÓN DE VISITAS + CARGA EJECUTABLE · PRÓXIMOS 7 DÍAS
+    # ========================================================
+
+    izquierda, derecha = st.columns(2, gap="medium")
+
+    with izquierda.container(border=True):
+
+        st.subheader(
+            "Programación de visitas",
+            icon=":material/event_available:",
+        )
+
+        visitas = (
+            df["ESTADO VISITA"]
+            .value_counts()
+            .sort_values()
+            .reset_index()
+        )
+
+        visitas.columns = [
+            "Estado",
+            "Visitas",
+        ]
+
+        fig = px.bar(
+            visitas,
+            x="Visitas",
+            y="Estado",
+            orientation="h",
+            text="Visitas",
+            color="Estado",
+            color_discrete_map={
+                "Visita programada - PQRSD Vencida":
+                    PALETTE["red"],
+                "Visita programada":
+                    PALETTE["teal"],
+                "Visita vencida":
+                    PALETTE["red"],
+                "Visita hoy":
+                    PALETTE["amber"],
+                "Escalado a proyectos":
+                    PALETTE["blue"],
+                "Sin fecha de visita":
+                    PALETTE["slate"],
+            },
+        )
+
+        fig.update_traces(
+            textposition="outside",
+            cliponaxis=False,
+        )
+
+        st.plotly_chart(
+            figura_base(
+                fig,
+                max(
+                    220,
+                    min(
+                        420,
+                        len(visitas) * 42,
+                    ),
+                ),
+            ),
+            width="stretch",
+        )
+
+    with derecha.container(border=True):
+
+        st.subheader(
+            "Carga ejecutable · próximos 7 días",
+            icon=":material/groups:",
+        )
+
+        if visitas_7_dias_n > 0:
+
+            col_tecnico = buscar_columna(
+                df,
+                [
+                    "TÉCNICO",
+                    "TECNICO",
+                    "TÉCNICO ASIGNADO",
+                    "TECNICO ASIGNADO",
+                ],
+            )
+
+            col_departamento = buscar_columna(
+                df,
+                [
+                    "DEPARTAMENTO",
+                ],
+            )
+
+            if (
+                col_tecnico is not None
+                and col_departamento is not None
+            ):
+
+                carga = df.loc[
+                    visitas_7_dias_mask,
+                    [
+                        col_tecnico,
+                        col_departamento,
+                    ],
+                ].copy()
+
+                carga.columns = [
+                    "Técnico",
+                    "Departamento",
+                ]
+
+                carga["Técnico"] = (
+                    carga["Técnico"]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                )
+
+                carga["Departamento"] = (
+                    carga["Departamento"]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                )
+
+                carga["Técnico"] = carga[
+                    "Técnico"
+                ].replace(
+                    "",
+                    "Sin asignar",
+                )
+
+                carga["Departamento"] = carga[
+                    "Departamento"
+                ].replace(
+                    "",
+                    "Sin departamento",
+                )
+
+                tabla_carga = (
+                    carga
+                    .groupby(
+                        "Técnico",
+                        as_index=False,
+                    )
+                    .agg(
+                        **{
+                            "Departamento(s)": (
+                                "Departamento",
+                                lambda serie:
+                                ", ".join(
+                                    sorted(
+                                        serie
+                                        .dropna()
+                                        .astype(str)
+                                        .str.strip()
+                                        .unique()
+                                    )
+                                ),
+                            ),
+                            "Visitas": (
+                                "Técnico",
+                                "size",
+                            ),
+                        }
+                    )
+                    .sort_values(
+                        [
+                            "Visitas",
+                            "Técnico",
+                        ],
+                        ascending=[
+                            False,
+                            True,
+                        ],
+                    )
+                    .reset_index(
+                        drop=True
+                    )
+                )
+
+                asignadas_n = int(
+                    (
+                        carga["Técnico"]
+                        .str.upper()
+                        .ne("SIN ASIGNAR")
+                    ).sum()
+                )
+
+                sin_asignar_n = int(
+                    (
+                        carga["Técnico"]
+                        .str.upper()
+                        .eq("SIN ASIGNAR")
+                    ).sum()
+                )
+
+                st.caption(
+                    f"Ventana: "
+                    f"{hoy:%d/%m/%Y} al "
+                    f"{(hoy + pd.Timedelta(days=6)):%d/%m/%Y} "
+                    f"· Visitas ejecutables: "
+                    f"{visitas_7_dias_n:,} "
+                    f"· Asignadas: "
+                    f"{asignadas_n:,} "
+                    f"· Sin técnico asignado: "
+                    f"{sin_asignar_n:,}"
+                )
+
+                st.dataframe(
+                    tabla_carga,
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "Técnico":
+                            st.column_config.Column(
+                                width=190
+                            ),
+                        "Departamento(s)":
+                            st.column_config.Column(
+                                width=320
+                            ),
+                        "Visitas":
+                            st.column_config.NumberColumn(
+                                width=100,
+                                format="%d",
+                            ),
+                    },
+                )
+
+            else:
+
+                st.info(
+                    "No se encontraron las columnas "
+                    "TÉCNICO y/o DEPARTAMENTO."
+                )
+
+        else:
+
+            st.success(
+                "No hay visitas ejecutables "
+                "programadas para los próximos 7 días."
+            )
+
+
+    # ========================================================
     # TABLA DETALLADA
     # ========================================================
 
@@ -1701,9 +2348,9 @@ def dashboard(
         border=True,
     ):
 
-        st.subheader(
-            "Dataframe",
-            icon=":material/table_chart:",
+        st.markdown(
+            '<div class="dataframe-title">Dataframe</div>',
+            unsafe_allow_html=True,
         )
 
         buscar = st.text_input(
@@ -1723,20 +2370,52 @@ def dashboard(
             "ESTADO",
             "ACCIÓN",
             "VIABILIDAD DE MTTO",
+            "FECHA DE VISITA",
             "FECHA VISITA",
+            "NUEVA FECHA MÁXIMA ATENCIÓN",
+            "NUEVA FECHA MAXIMA ATENCION",
             "TÉCNICO",
             "NOVEDAD",
+            "ESTADO VISITA",
         ]
 
-        columnas_disponibles = [
-            c
-            for c in columnas
-            if c in df.columns
-        ]
+        columnas_disponibles = []
+
+        for c in columnas:
+
+            if (
+                c in df.columns
+                and c not in columnas_disponibles
+            ):
+
+                columnas_disponibles.append(c)
 
         tabla = df[
             columnas_disponibles
         ].copy()
+
+        columnas_fecha = [
+            "FECHA DE VISITA",
+            "FECHA VISITA",
+            "NUEVA FECHA MÁXIMA ATENCIÓN",
+            "NUEVA FECHA MAXIMA ATENCION",
+        ]
+
+        for c in columnas_fecha:
+
+            if c in tabla.columns:
+
+                tabla[c] = (
+                    pd.to_datetime(
+                        tabla[c],
+                        errors="coerce",
+                        dayfirst=True,
+                    )
+                    .dt.strftime(
+                        "%d/%m/%Y"
+                    )
+                    .fillna("")
+                )
 
         if buscar:
 
@@ -1759,11 +2438,84 @@ def dashboard(
                 coincidencia
             ]
 
+        st.markdown(
+            '<div class="dataframe-caption">Desplazamiento horizontal disponible para consultar todas las columnas.</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Misma columna ESTADO PQRS CON PDR:
+        # se conserva el texto y se añade solo el indicador visual.
+        if "ESTADO PQRS CON PDR" in tabla.columns:
+
+            def etiqueta_estado_pqrs(
+                valor,
+            ):
+
+                texto = str(
+                    valor
+                ).strip()
+
+                normalizado = texto.upper()
+
+                if normalizado == "VIGENTE":
+                    return "● VIGENTE"
+
+                if normalizado in {
+                    "PRÓXIMO A VENCER",
+                    "PROXIMO A VENCER",
+                }:
+                    return "● PRÓXIMO A VENCER"
+
+                if normalizado == "VENCIDO":
+                    return "● VENCIDO"
+
+                return texto
+
+            tabla[
+                "ESTADO PQRS CON PDR"
+            ] = (
+                tabla[
+                    "ESTADO PQRS CON PDR"
+                ]
+                .map(
+                    etiqueta_estado_pqrs
+                )
+            )
+
+        tabla_estilizada = tabla.style
+
+        if "ESTADO PQRS CON PDR" in tabla.columns:
+
+            tabla_estilizada = (
+                tabla_estilizada.map(
+                    estilo_estado_pqrs,
+                    subset=[
+                        "ESTADO PQRS CON PDR"
+                    ],
+                )
+            )
+
+        configuracion_columnas = {
+            columna_nombre:
+                st.column_config.Column(
+                    width=170
+                )
+            for columna_nombre in tabla.columns
+        }
+
+        if "ESTADO PQRS CON PDR" in tabla.columns:
+            configuracion_columnas[
+                "ESTADO PQRS CON PDR"
+            ] = st.column_config.Column(
+                width=190
+            )
+
         st.dataframe(
-            tabla,
+            tabla_estilizada,
             height=420,
             width="stretch",
             hide_index=True,
+            column_config=configuracion_columnas,
         )
 
 
