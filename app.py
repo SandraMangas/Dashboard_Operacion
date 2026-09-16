@@ -556,6 +556,7 @@ def clasificar_visitas(
     - Visita hoy
     - Visita programada
     - Visita programada - caso vencido
+    - Visita vencida - fecha máxima de atención (Novedad con fecha < hoy)
     """
 
     resultado = df.copy()
@@ -661,6 +662,38 @@ def clasificar_visitas(
             "Visita programada - caso vencido"
         )
 
+    # --------------------------------------------------------
+    # NOVEDAD CON FECHA INFERIOR A HOY (FECHA MÁXIMA DE ATENCIÓN)
+    # --------------------------------------------------------
+    col_novedad = buscar_columna(
+        resultado,
+        [
+            "NOVEDAD",
+            "NOVEDADES",
+            "OBSERVACION",
+            "OBSERVACIONES",
+        ],
+    )
+
+    if col_novedad is not None:
+        tiene_novedad = (
+            resultado[col_novedad]
+            .notna()
+            & (resultado[col_novedad].astype(str).str.strip() != "")
+            & (resultado[col_novedad].astype(str).str.upper() != "SIN INFORMACIÓN")
+        )
+
+        condicion_novedad_vencida = (
+            fechas.notna()
+            & (fechas < hoy)
+            & tiene_novedad
+        )
+
+        resultado.loc[
+            condicion_novedad_vencida,
+            "_ESTADO_VISITA",
+        ] = "Visita vencida - fecha máxima de atención"
+
     return resultado
 
 
@@ -733,14 +766,14 @@ def calcular_estado_gerencial(
     Regla:
 
     🔴 REQUIERE ATENCIÓN
-       Hay vencidos NO escalados a proyectos.
+        Hay vencidos NO escalados a proyectos.
 
     🟠 ATENCIÓN PREVENTIVA
-       No hay vencidos operativos, pero sí próximos
-       a vencer NO escalados a proyectos.
+        No hay vencidos operativos, pero sí próximos
+        a vencer NO escalados a proyectos.
 
     🟢 OPERACIÓN CONTROLADA
-       No hay vencidos ni próximos a vencer operativos.
+        No hay vencidos ni próximos a vencer operativos.
 
     Los casos escalados a proyectos NO generan alerta.
     """
@@ -1404,403 +1437,4 @@ def dashboard(
     izquierda, derecha = st.columns(
         2,
         gap="medium",
-    )
-
-    # --------------------------------------------------------
-    # ACCIÓN REQUERIDA
-    # --------------------------------------------------------
-
-    with izquierda.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Acción requerida",
-            icon=":material/task_alt:",
-        )
-
-        col_accion = buscar_columna(
-            df,
-            [
-                "ACCIÓN",
-                "ACCION",
-                "ACCIÓN REQUERIDA",
-                "ACCION REQUERIDA",
-            ],
-        )
-
-        if col_accion:
-
-            acciones = limpiar_texto(
-                df[col_accion]
-            )
-
-            resumen_accion = (
-                acciones
-                .value_counts()
-                .sort_values()
-                .reset_index()
-            )
-
-            resumen_accion.columns = [
-                "Acción",
-                "Casos",
-            ]
-
-            fig = px.bar(
-                resumen_accion,
-                x="Casos",
-                y="Acción",
-                orientation="h",
-                text="Casos",
-                color_discrete_sequence=[
-                    PALETTE["blue"]
-                ],
-            )
-
-            fig.update_traces(
-                textposition="outside",
-                cliponaxis=False,
-            )
-
-            st.plotly_chart(
-                figura_base(
-                    fig,
-                    max(
-                        290,
-                        len(resumen_accion) * 42,
-                    ),
-                ),
-                width="stretch",
-            )
-
-        else:
-
-            st.info(
-                "No se encontró la columna ACCIÓN."
-            )
-
-    # --------------------------------------------------------
-    # PROGRAMACIÓN DE VISITAS
-    # --------------------------------------------------------
-
-    with derecha.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Programación de visitas",
-            icon=":material/event_available:",
-        )
-
-        visitas = (
-            df["_ESTADO_VISITA"]
-            .value_counts()
-            .sort_values()
-            .reset_index()
-        )
-
-        visitas.columns = [
-            "Estado",
-            "Casos",
-        ]
-
-        fig = px.bar(
-            visitas,
-            x="Casos",
-            y="Estado",
-            orientation="h",
-            text="Casos",
-            color="Estado",
-            color_discrete_map={
-                "Visita vencida": PALETTE["red"],
-                "Visita hoy": PALETTE["amber"],
-                "Visita programada": PALETTE["teal"],
-                "Visita programada - caso vencido": PALETTE["red"],
-                "Sin fecha": PALETTE["slate"],
-            },
-        )
-
-        fig.update_traces(
-            textposition="outside",
-            cliponaxis=False,
-        )
-
-        st.plotly_chart(
-            figura_base(
-                fig,
-                max(
-                    290,
-                    len(visitas) * 45,
-                ),
-            ),
-            width="stretch",
-        )
-
-    # ========================================================
-    # DEPARTAMENTO + BLOQUEOS
-    # ========================================================
-
-    izquierda, derecha = st.columns(
-        2,
-        gap="medium",
-    )
-
-    # --------------------------------------------------------
-    # DEPARTAMENTO
-    # --------------------------------------------------------
-
-    with izquierda.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Casos por departamento",
-            icon=":material/location_on:",
-        )
-
-        if "DEPARTAMENTO" in df.columns:
-
-            resumen = (
-                df["DEPARTAMENTO"]
-                .fillna("Sin departamento")
-                .astype(str)
-                .str.strip()
-                .value_counts()
-                .head(10)
-                .sort_values()
-                .reset_index()
-            )
-
-            resumen.columns = [
-                "Departamento",
-                "Casos",
-            ]
-
-            fig = px.bar(
-                resumen,
-                x="Casos",
-                y="Departamento",
-                orientation="h",
-                text="Casos",
-                color_discrete_sequence=[
-                    PALETTE["blue"]
-                ],
-            )
-
-            fig.update_traces(
-                textposition="outside",
-                cliponaxis=False,
-            )
-
-            st.plotly_chart(
-                figura_base(fig),
-                width="stretch",
-            )
-
-        else:
-
-            st.info(
-                "No se encontró la columna de departamento."
-            )
-
-    # --------------------------------------------------------
-    # BLOQUEOS
-    # --------------------------------------------------------
-
-    with derecha.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Principales bloqueos",
-            icon=":material/block:",
-        )
-
-        if {
-            "VIABILIDAD DE MTTO",
-            "NOVEDAD",
-        }.issubset(df.columns):
-
-            viabilidad_bloqueos = (
-                df["VIABILIDAD DE MTTO"]
-                .fillna("")
-                .astype(str)
-                .str.strip()
-                .str.upper()
-            )
-
-            bloqueos = df.loc[
-                viabilidad_bloqueos.eq(
-                    "NO EJECUTABLE"
-                ),
-                "NOVEDAD",
-            ]
-
-            resumen = (
-                bloqueos
-                .dropna()
-                .astype(str)
-                .str.strip()
-                .replace(
-                    "",
-                    "Sin información",
-                )
-                .value_counts()
-                .head(10)
-                .sort_values()
-                .reset_index()
-            )
-
-            resumen.columns = [
-                "Novedad",
-                "Casos",
-            ]
-
-            if resumen.empty:
-
-                st.success(
-                    "No hay bloqueos en los filtros seleccionados."
-                )
-
-            else:
-
-                fig = px.bar(
-                    resumen,
-                    x="Casos",
-                    y="Novedad",
-                    orientation="h",
-                    text="Casos",
-                    color_discrete_sequence=[
-                        PALETTE["red"]
-                    ],
-                )
-
-                fig.update_traces(
-                    textposition="outside",
-                    cliponaxis=False,
-                )
-
-                st.plotly_chart(
-                    figura_base(fig),
-                    width="stretch",
-                )
-
-        else:
-
-            st.info(
-                "No se encontraron las columnas "
-                "de viabilidad y novedad."
-            )
-
-    # ========================================================
-    # TABLA DETALLADA
-    # ========================================================
-
-    with st.container(
-        border=True,
-    ):
-
-        st.subheader(
-            "Dataframe",
-            icon=":material/table_chart:",
-        )
-
-        buscar = st.text_input(
-            "Buscar en la tabla",
-            placeholder=(
-                "Municipio, técnico, cédula o novedad..."
-            ),
-        )
-
-        columnas = [
-            "ALIADOS",
-            "ID BENEFICIARIO",
-            "DEPARTAMENTO",
-            "MUNICIPIO",
-            "PRIORIDAD",
-            "ESTADO PQRS CON PDR",
-            "ESTADO",
-            "ACCIÓN",
-            "VIABILIDAD DE MTTO",
-            "FECHA VISITA",
-            "TÉCNICO",
-            "NOVEDAD",
-        ]
-
-        columnas_disponibles = [
-            c
-            for c in columnas
-            if c in df.columns
-        ]
-
-        tabla = df[
-            columnas_disponibles
-        ].copy()
-
-        if buscar:
-
-            coincidencia = (
-                tabla
-                .astype(str)
-                .apply(
-                    lambda serie:
-                    serie.str.contains(
-                        buscar,
-                        case=False,
-                        na=False,
-                        regex=False,
-                    )
-                )
-                .any(axis=1)
-            )
-
-            tabla = tabla[
-                coincidencia
-            ]
-
-        st.dataframe(
-            tabla,
-            height=420,
-            width="stretch",
-            hide_index=True,
-        )
-
-
-# ============================================================
-# EJECUCIÓN
-# ============================================================
-
-st.sidebar.caption(
-    "Dashboard ejecutivo · RoadMap"
-)
-
-datos = cargar_roadmap()
-
-if datos.empty:
-
-    st.title(
-        "Dashboard ejecutivo",
-        icon=":material/monitoring:",
-    )
-
-    if ARCHIVO_GUARDADO.exists():
-
-        st.warning(
-            "No hay registros para la combinación "
-            "de filtros seleccionada."
-        )
-
-    else:
-
-        st.info(
-            "Carga un archivo Excel con la hoja "
-            "**RoadMap** para comenzar.",
-            icon=":material/upload:",
-        )
-
-else:
-
-    dashboard(
-        datos
     )
