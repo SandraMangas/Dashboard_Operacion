@@ -213,21 +213,38 @@ def buscar_columna(
     df: pd.DataFrame,
     candidatos: list[str],
 ) -> str | None:
-    """Busca primero coincidencia exacta y luego parcial."""
+    """
+    Busca primero coincidencia exacta y luego parcial.
+    """
 
     columnas = {
         str(col).strip().upper(): col
         for col in df.columns
     }
 
+    # --------------------------------------------------------
+    # COINCIDENCIA EXACTA
+    # --------------------------------------------------------
+
     for candidato in candidatos:
+
         clave = candidato.strip().upper()
+
         if clave in columnas:
             return columnas[clave]
 
+    # --------------------------------------------------------
+    # COINCIDENCIA PARCIAL
+    # --------------------------------------------------------
+
     for clave, original in columnas.items():
+
         for candidato in candidatos:
-            candidato_normalizado = candidato.strip().upper()
+
+            candidato_normalizado = (
+                candidato.strip().upper()
+            )
+
             if candidato_normalizado in clave:
                 return original
 
@@ -254,7 +271,9 @@ def calcular_porcentaje(
 def cargar_datos(
     file_bytes: bytes,
 ) -> pd.DataFrame:
-    """Lee la hoja RoadMap del archivo Excel."""
+    """
+    Lee la hoja RoadMap del archivo Excel.
+    """
 
     return pd.read_excel(
         BytesIO(file_bytes),
@@ -267,11 +286,21 @@ def cargar_datos(
 # ============================================================
 
 def cargar_roadmap() -> pd.DataFrame:
+    """
+    Si existe archivo_actual.xlsx, lo carga automáticamente.
+
+    Si el usuario selecciona un nuevo archivo (solo local):
+    - se guarda como archivo_actual.xlsx
+    - se limpia la caché
+    - se carga la nueva versión
+    """
+
     ARCHIVO_GUARDADO.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
 
+    # Detección de entorno (Producción en Streamlit Cloud o Local)
     es_produccion = (
         st.secrets.get("modo_produccion", False) 
         or os.getenv("STREAMLIT_SHARING_MODE") is not None
@@ -280,24 +309,37 @@ def cargar_roadmap() -> pd.DataFrame:
     archivo_nuevo = None
 
     with st.sidebar:
+
         st.header(
             "Datos y filtros",
             icon=":material/tune:",
         )
 
+        # ----------------------------------------------------
+        # ESTADO DEL ARCHIVO
+        # ----------------------------------------------------
+
         if ARCHIVO_GUARDADO.exists():
+
             st.success(
                 "Archivo cargado",
                 icon=":material/check_circle:",
             )
+
             st.caption(
                 f"Fuente actual: **{ARCHIVO_GUARDADO.name}**"
             )
+
         else:
+
             st.info(
                 "Aún no hay un archivo guardado.",
                 icon=":material/info:",
             )
+
+        # ----------------------------------------------------
+        # ACTUALIZAR ARCHIVO (Solo visible en entorno local)
+        # ----------------------------------------------------
 
         if not es_produccion:
             archivo_nuevo = st.file_uploader(
@@ -310,17 +352,47 @@ def cargar_roadmap() -> pd.DataFrame:
                 ),
             )
        
+    # ========================================================
+    # NUEVO ARCHIVO
+    # ========================================================
+
     if archivo_nuevo is not None:
+
         nuevos_bytes = archivo_nuevo.getvalue()
-        ARCHIVO_GUARDADO.write_bytes(nuevos_bytes)
+
+        ARCHIVO_GUARDADO.write_bytes(
+            nuevos_bytes
+        )
+
         cargar_datos.clear()
-        datos = cargar_datos(nuevos_bytes).copy()
+
+        datos = (
+            cargar_datos(
+                nuevos_bytes
+            )
+            .copy()
+        )
+
+    # ========================================================
+    # ARCHIVO EXISTENTE
+    # ========================================================
 
     elif ARCHIVO_GUARDADO.exists():
-        datos = cargar_datos(ARCHIVO_GUARDADO.read_bytes()).copy()
+
+        datos = (
+            cargar_datos(
+                ARCHIVO_GUARDADO.read_bytes()
+            )
+            .copy()
+        )
 
     else:
+
         return pd.DataFrame()
+
+    # ========================================================
+    # FILTROS
+    # ========================================================
 
     filtros = [
         ("ALIADOS", "Aliado"),
@@ -331,12 +403,14 @@ def cargar_roadmap() -> pd.DataFrame:
     ]
 
     with st.sidebar:
+
         st.subheader(
             "Filtros principales",
             icon=":material/filter_list:",
         )
 
         for campo, etiqueta in filtros:
+
             if campo not in datos.columns:
                 continue
 
@@ -345,12 +419,17 @@ def cargar_roadmap() -> pd.DataFrame:
                 .dropna()
                 .astype(str)
                 .str.strip()
-                .replace("", "Sin información")
+                .replace(
+                    "",
+                    "Sin información",
+                )
                 .unique()
                 .tolist()
             )
 
-            opciones = ["Todos"] + sorted(opciones)
+            opciones = [
+                "Todos"
+            ] + sorted(opciones)
 
             elegido = st.selectbox(
                 etiqueta,
@@ -359,6 +438,7 @@ def cargar_roadmap() -> pd.DataFrame:
             )
 
             if elegido != "Todos":
+
                 datos = datos[
                     datos[campo]
                     .astype(str)
@@ -374,14 +454,18 @@ def cargar_roadmap() -> pd.DataFrame:
 # ============================================================
 
 def mostrar_reloj() -> None:
+
     ahora = datetime.now(ZoneInfo("America/Bogota"))
+
     st.caption(
-        f":material/schedule: **{ahora:%d/%m/%Y · %I:%M %p}**"
+        f":material/schedule: "        
+        f"**{ahora:%d/%m/%Y · %I:%M %p}**"
     )
 
 
 @st.fragment(run_every="60s")
 def reloj_actualizable() -> None:
+
     mostrar_reloj()
 
 
@@ -389,14 +473,27 @@ def reloj_actualizable() -> None:
 # FIGURAS
 # ============================================================
 
-def figura_base(fig, height: int = 290):
+def figura_base(
+    fig,
+    height: int = 290,
+):
+
     fig.update_layout(
         height=height,
-        margin=dict(t=20, b=10, l=10, r=10),
+        margin=dict(
+            t=20,
+            b=10,
+            l=10,
+            r=10,
+        ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#25364A"),
-        coloraxis_colorbar=dict(title=None),
+        font=dict(
+            color="#25364A"
+        ),
+        coloraxis_colorbar=dict(
+            title=None
+        ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -405,8 +502,18 @@ def figura_base(fig, height: int = 290):
             x=0,
         ),
     )
-    fig.update_xaxes(showgrid=True, gridcolor="#E7EDF3", zeroline=False)
-    fig.update_yaxes(showgrid=False, zeroline=False)
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="#E7EDF3",
+        zeroline=False,
+    )
+
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+    )
+
     return fig
 
 
@@ -420,6 +527,7 @@ def tarjeta_kpi(
     detalle: str,
     color: str,
 ) -> None:
+
     st.markdown(
         f"""
         <div class="kpi-card kpi-card--{color}">
@@ -436,7 +544,20 @@ def tarjeta_kpi(
 # CLASIFICACIÓN DE VISITAS
 # ============================================================
 
-def clasificar_visitas(df: pd.DataFrame) -> pd.DataFrame:
+def clasificar_visitas(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Clasifica las visitas según la fecha disponible.
+
+    Valores:
+    - Sin fecha
+    - Visita vencida
+    - Visita hoy
+    - Visita programada
+    - Visita programada - caso vencido
+    """
+
     resultado = df.copy()
 
     col_fecha = buscar_columna(
@@ -451,7 +572,11 @@ def clasificar_visitas(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     if col_fecha is None:
-        resultado["_ESTADO_VISITA"] = "Sin fecha"
+
+        resultado["_ESTADO_VISITA"] = (
+            "Sin fecha"
+        )
+
         return resultado
 
     fechas = (
@@ -462,24 +587,44 @@ def clasificar_visitas(df: pd.DataFrame) -> pd.DataFrame:
         .dt.normalize()
     )
 
+    # Obtenemos la hora de Colombia sin zona horaria para evitar errores de comparación con pandas
     hoy = pd.Timestamp.now(ZoneInfo("America/Bogota")).normalize().tz_localize(None)
 
-    resultado["_ESTADO_VISITA"] = "Sin fecha"
+    resultado["_ESTADO_VISITA"] = (
+        "Sin fecha"
+    )
+
+    # --------------------------------------------------------
+    # VISITA VENCIDA
+    # --------------------------------------------------------
 
     resultado.loc[
-        fechas.notna() & (fechas < hoy),
+        fechas.notna()
+        & (fechas < hoy),
         "_ESTADO_VISITA",
     ] = "Visita vencida"
+
+    # --------------------------------------------------------
+    # VISITA HOY
+    # --------------------------------------------------------
 
     resultado.loc[
         fechas == hoy,
         "_ESTADO_VISITA",
     ] = "Visita hoy"
 
+    # --------------------------------------------------------
+    # VISITA PROGRAMADA
+    # --------------------------------------------------------
+
     resultado.loc[
         fechas > hoy,
         "_ESTADO_VISITA",
     ] = "Visita programada"
+
+    # --------------------------------------------------------
+    # CASO VENCIDO + VISITA FUTURA
+    # --------------------------------------------------------
 
     col_estado_pqrs = buscar_columna(
         resultado,
@@ -491,42 +636,30 @@ def clasificar_visitas(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     if col_estado_pqrs is not None:
-        estados_pqrs = limpiar_texto(resultado[col_estado_pqrs]).str.upper()
-        caso_vencido = estados_pqrs == "VENCIDO"
-        visita_programada = resultado["_ESTADO_VISITA"] == "Visita programada"
 
-        resultado.loc[
-            caso_vencido & visita_programada,
-            "_ESTADO_VISITA",
-        ] = "Visita programada - caso vencido"
-
-    col_novedad = buscar_columna(
-        resultado,
-        [
-            "NOVEDAD",
-            "NOVEDADES",
-            "OBSERVACION",
-            "OBSERVACIONES",
-        ],
-    )
-
-    if col_novedad is not None:
-        tiene_novedad = (
-            resultado[col_novedad].notna()
-            & (resultado[col_novedad].astype(str).str.strip() != "")
-            & (resultado[col_novedad].astype(str).str.upper() != "SIN INFORMACIÓN")
+        estados_pqrs = (
+            limpiar_texto(
+                resultado[col_estado_pqrs]
+            )
+            .str.upper()
         )
 
-        condicion_novedad_vencida = (
-            fechas.notna()
-            & (fechas < hoy)
-            & tiene_novedad
+        caso_vencido = (
+            estados_pqrs == "VENCIDO"
+        )
+
+        visita_programada = (
+            resultado["_ESTADO_VISITA"]
+            == "Visita programada"
         )
 
         resultado.loc[
-            condicion_novedad_vencida,
+            caso_vencido
+            & visita_programada,
             "_ESTADO_VISITA",
-        ] = "Visita vencida - fecha máxima de atención"
+        ] = (
+            "Visita programada - caso vencido"
+        )
 
     return resultado
 
@@ -535,67 +668,173 @@ def clasificar_visitas(df: pd.DataFrame) -> pd.DataFrame:
 # ESCALADOS A PROYECTOS
 # ============================================================
 
-def mascara_escalado_proyectos(df: pd.DataFrame) -> pd.Series:
+def mascara_escalado_proyectos(
+    df: pd.DataFrame,
+) -> pd.Series:
+    """
+    Identifica los casos escalados a proyectos
+    a partir de la columna ESTADO.
+
+    Se considera escalado cuando ESTADO contiene
+    la palabra PROYECT.
+    """
+
     if "ESTADO" not in df.columns:
-        return pd.Series(False, index=df.index)
 
-    estados = limpiar_texto(df["ESTADO"]).str.upper()
-    return estados.str.contains("PROYECT", na=False)
+        return pd.Series(
+            False,
+            index=df.index,
+        )
+
+    estados = (
+        limpiar_texto(
+            df["ESTADO"]
+        )
+        .str.upper()
+    )
+
+    return estados.str.contains(
+        "PROYECT",
+        na=False,
+    )
 
 
-def contar_escalados_proyectos(df: pd.DataFrame) -> tuple[int, str | None]:
+def contar_escalados_proyectos(
+    df: pd.DataFrame,
+) -> tuple[int, str | None]:
+    """
+    Cuenta casos escalados a proyectos.
+    """
+
     if "ESTADO" not in df.columns:
+
         return 0, None
 
-    mascara = mascara_escalado_proyectos(df)
-    return int(mascara.sum()), "ESTADO"
+    mascara = mascara_escalado_proyectos(
+        df
+    )
+
+    return (
+        int(mascara.sum()),
+        "ESTADO",
+    )
 
 
 # ============================================================
 # ESTADO GERENCIAL
 # ============================================================
 
-def calcular_estado_gerencial(df: pd.DataFrame) -> dict:
+def calcular_estado_gerencial(
+    df: pd.DataFrame,
+) -> dict:
+    """
+    Determina el semáforo gerencial.
+
+    Regla:
+
+    🔴 REQUIERE ATENCIÓN
+       Hay vencidos NO escalados a proyectos.
+
+    🟠 ATENCIÓN PREVENTIVA
+       No hay vencidos operativos, pero sí próximos
+       a vencer NO escalados a proyectos.
+
+    🟢 OPERACIÓN CONTROLADA
+       No hay vencidos ni próximos a vencer operativos.
+
+    Los casos escalados a proyectos NO generan alerta.
+    """
+
     estado_pqrs = (
-        columna(df, "ESTADO PQRS CON PDR")
+        columna(
+            df,
+            "ESTADO PQRS CON PDR",
+        )
         .fillna("")
         .astype(str)
         .str.upper()
         .str.strip()
     )
 
-    escalado_proyectos = mascara_escalado_proyectos(df)
+    escalado_proyectos = (
+        mascara_escalado_proyectos(
+            df
+        )
+    )
 
-    vencidos_operativos = estado_pqrs.eq("VENCIDO") & ~escalado_proyectos
-    proximos_operativos = (
-        estado_pqrs.isin(["PRÓXIMO A VENCER", "PROXIMO A VENCER"])
+    # --------------------------------------------------------
+    # VENCIDOS OPERATIVOS
+    # --------------------------------------------------------
+
+    vencidos_operativos = (
+        estado_pqrs.eq("VENCIDO")
         & ~escalado_proyectos
     )
 
-    vencidos_n = int(vencidos_operativos.sum())
-    proximos_n = int(proximos_operativos.sum())
-    escalados_n = int(escalado_proyectos.sum())
+    # --------------------------------------------------------
+    # PRÓXIMOS A VENCER OPERATIVOS
+    # --------------------------------------------------------
+
+    proximos_operativos = (
+        estado_pqrs.isin(
+            [
+                "PRÓXIMO A VENCER",
+                "PROXIMO A VENCER",
+            ]
+        )
+        & ~escalado_proyectos
+    )
+
+    vencidos_n = int(
+        vencidos_operativos.sum()
+    )
+
+    proximos_n = int(
+        proximos_operativos.sum()
+    )
+
+    escalados_n = int(
+        escalado_proyectos.sum()
+    )
+
+    # --------------------------------------------------------
+    # SEMÁFORO
+    # --------------------------------------------------------
 
     if vencidos_n > 0:
+
         estado = {
             "texto": "Estado: requiere atención",
             "icono": ":material/warning:",
             "color": "red",
-            "detalle": f"{vencidos_n:,} vencidos operativos",
+            "detalle": (
+                f"{vencidos_n:,} "
+                f"vencidos operativos"
+            ),
         }
+
     elif proximos_n > 0:
+
         estado = {
             "texto": "Estado: atención preventiva",
             "icono": ":material/priority_high:",
             "color": "orange",
-            "detalle": f"{proximos_n:,} próximos a vencer operativos",
+            "detalle": (
+                f"{proximos_n:,} "
+                f"próximos a vencer operativos"
+            ),
         }
+
     else:
+
         estado = {
             "texto": "Estado: operación controlada",
             "icono": ":material/check_circle:",
             "color": "green",
-            "detalle": "Sin vencidos ni próximos a vencer operativos",
+            "detalle": (
+                "Sin vencidos ni próximos a vencer "
+                "operativos"
+            ),
         }
 
     return {
@@ -613,38 +852,72 @@ def calcular_estado_gerencial(df: pd.DataFrame) -> dict:
 # HEADER
 # ============================================================
 
-def mostrar_cabecera(estado_gerencial: dict) -> None:
-    with st.container(key="executive_header", gap="small"):
+def mostrar_cabecera(
+    estado_gerencial: dict,
+) -> None:
+
+    with st.container(
+        key="executive_header",
+        gap="small",
+    ):
+
         logo, texto, estado = st.columns(
             [1.45, 5.85, 2.0],
             gap="small",
             vertical_alignment="center",
         )
 
+        # ----------------------------------------------------
+        # LOGO
+        # ----------------------------------------------------
+
         with logo:
+
             if TESERACT_LOGO.exists():
-                st.image(TESERACT_LOGO, width=150)
+
+                st.image(
+                    TESERACT_LOGO,
+                    width=150,
+                )
+
+        # ----------------------------------------------------
+        # TÍTULO
+        # ----------------------------------------------------
 
         with texto:
+
             st.markdown(
                 """
                 <div class="header-title">
-                    Dashboard Ejecutivo — Seguimiento Operativo y Contractual
+                    Dashboard Ejecutivo —
+                    Seguimiento Operativo y Contractual
                 </div>
+
                 <div class="header-subtitle">
-                    Panorama gerencial de RoadMap · riesgos, vencimientos, ejecutabilidad y capacidad operativa
+                    Panorama gerencial de RoadMap ·
+                    riesgos, vencimientos,
+                    ejecutabilidad y capacidad operativa
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
+        # ----------------------------------------------------
+        # SEMÁFORO GERENCIAL
+        # ----------------------------------------------------
+
         with estado:
-            estado_info = estado_gerencial["estado"]
+
+            estado_info = (
+                estado_gerencial["estado"]
+            )
+
             st.badge(
                 estado_info["texto"],
                 icon=estado_info["icono"],
                 color=estado_info["color"],
             )
+
             st.markdown(
                 f"""
                 <div class="header-status-detail">
@@ -654,12 +927,23 @@ def mostrar_cabecera(estado_gerencial: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-            escalados_n = estado_gerencial["escalados_n"]
+            # ------------------------------------------------
+            # INFORMACIÓN DE ESCALADOS
+            # ------------------------------------------------
+
+            escalados_n = (
+                estado_gerencial[
+                    "escalados_n"
+                ]
+            )
+
             if escalados_n > 0:
+
                 st.markdown(
                     f"""
                     <div class="header-status-detail">
-                        {escalados_n:,} escalados a proyectos · fuera de alerta operativa
+                        {escalados_n:,} escalados a proyectos
+                        · fuera de alerta operativa
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -672,79 +956,274 @@ def mostrar_cabecera(estado_gerencial: dict) -> None:
 # DASHBOARD
 # ============================================================
 
-def dashboard(df: pd.DataFrame) -> None:
-    df = clasificar_visitas(df)
+def dashboard(
+    df: pd.DataFrame,
+) -> None:
+
+    # --------------------------------------------------------
+    # PREPARACIÓN
+    # --------------------------------------------------------
+
+    df = clasificar_visitas(
+        df
+    )
+
     total_registros = len(df)
 
-    viabilidad = (
-        columna(df, "VIABILIDAD DE MTTO")
+    # --------------------------------------------------------
+    # ESTADO PQRSD
+    # --------------------------------------------------------
+
+    estado_pqrs = (
+        columna(
+            df,
+            "ESTADO PQRS CON PDR",
+        )
         .fillna("")
         .astype(str)
         .str.strip()
     )
 
-    estado_gerencial = calcular_estado_gerencial(df)
-    vencidos_n = estado_gerencial["vencidos_n"]
-    proximos_n = estado_gerencial["proximos_n"]
-    escalados_n = estado_gerencial["escalados_n"]
+    # --------------------------------------------------------
+    # VIABILIDAD
+    # --------------------------------------------------------
 
-    ejecutables_n = int(viabilidad.str.upper().eq("EJECUTABLE").sum())
-    no_ejecutables_n = int(viabilidad.str.upper().eq("NO EJECUTABLE").sum())
-
-    id_beneficiario = columna(df, "ID BENEFICIARIO")
-    total_cd = total_registros if id_beneficiario.empty else id_beneficiario.nunique()
-
-    pqrs = columna(df, "CANT. PQRSD")
-    total_pqrs = (
-        pd.to_numeric(pqrs, errors="coerce").fillna(0).sum()
-        if not pqrs.empty
-        else total_registros
+    viabilidad = (
+        columna(
+            df,
+            "VIABILIDAD DE MTTO",
+        )
+        .fillna("")
+        .astype(str)
+        .str.strip()
     )
 
-    mostrar_cabecera(estado_gerencial)
+    # --------------------------------------------------------
+    # ESTADO GERENCIAL
+    # --------------------------------------------------------
 
-    # Indicadores clave
-    st.subheader("Indicadores clave", icon=":material/query_stats:")
+    estado_gerencial = (
+        calcular_estado_gerencial(
+            df
+        )
+    )
 
-    _, kpi_1, _, kpi_2, _, kpi_3, _, kpi_4, _ = st.columns(
-        [0.35, 1, 0.10, 1, 0.10, 1, 0.10, 1, 0.35]
+    vencidos_n = (
+        estado_gerencial[
+            "vencidos_n"
+        ]
+    )
+
+    proximos_n = (
+        estado_gerencial[
+            "proximos_n"
+        ]
+    )
+
+    escalados_n = (
+        estado_gerencial[
+            "escalados_n"
+        ]
+    )
+
+    # --------------------------------------------------------
+    # MÉTRICAS GENERALES
+    # --------------------------------------------------------
+
+    ejecutables_n = int(
+        viabilidad
+        .str.upper()
+        .eq("EJECUTABLE")
+        .sum()
+    )
+
+    no_ejecutables_n = int(
+        viabilidad
+        .str.upper()
+        .eq("NO EJECUTABLE")
+        .sum()
+    )
+
+    # --------------------------------------------------------
+    # CD
+    # --------------------------------------------------------
+
+    id_beneficiario = columna(
+        df,
+        "ID BENEFICIARIO",
+    )
+
+    if id_beneficiario.empty:
+
+        total_cd = total_registros
+
+    else:
+
+        total_cd = (
+            id_beneficiario
+            .nunique()
+        )
+
+    # --------------------------------------------------------
+    # PQRSD
+    # --------------------------------------------------------
+
+    pqrs = columna(
+        df,
+        "CANT. PQRSD",
+    )
+
+    if not pqrs.empty:
+
+        total_pqrs = (
+            pd.to_numeric(
+                pqrs,
+                errors="coerce",
+            )
+            .fillna(0)
+            .sum()
+        )
+
+    else:
+
+        total_pqrs = total_registros
+
+    # ========================================================
+    # HEADER
+    # ========================================================
+
+    mostrar_cabecera(
+        estado_gerencial
+    )
+
+    # ========================================================
+    # INDICADORES CLAVE
+    # ========================================================
+
+    st.subheader(
+        "Indicadores clave",
+        icon=":material/query_stats:",
+    )
+
+    # --------------------------------------------------------
+    # FILA 1
+    # --------------------------------------------------------
+
+    (
+        margen_izq,
+        kpi_1,
+        sep_1,
+        kpi_2,
+        sep_2,
+        kpi_3,
+        sep_3,
+        kpi_4,
+        margen_der,
+    ) = st.columns(
+        [
+            0.35,
+            1,
+            0.10,
+            1,
+            0.10,
+            1,
+            0.10,
+            1,
+            0.35,
+        ]
     )
 
     with kpi_1:
-        tarjeta_kpi("CD", f"{total_cd:,}", "", "blue")
+
+        tarjeta_kpi(
+            "CD",
+            f"{total_cd:,}",
+            "",
+            "blue",
+        )
+
     with kpi_2:
-        tarjeta_kpi("PQRSD", f"{int(total_pqrs):,}", "", "blue")
+
+        tarjeta_kpi(
+            "PQRSD",
+            f"{int(total_pqrs):,}",
+            "",
+            "blue",
+        )
+
     with kpi_3:
+
         tarjeta_kpi(
             "Vencidos",
-            f"{calcular_porcentaje(vencidos_n, total_registros):.1f}%",
+            (
+                f"{calcular_porcentaje(vencidos_n, total_registros):.1f}%"
+            ),
             f"{vencidos_n:,}",
             "red",
         )
+
     with kpi_4:
-        tarjeta_kpi("Próximos a vencer", f"{proximos_n:,}", "", "amber")
 
-    st.markdown('<div class="dashboard-space"></div>', unsafe_allow_html=True)
+        tarjeta_kpi(
+            "Próximos a vencer",
+            f"{proximos_n:,}",
+            "",
+            "amber",
+        )
 
-    _, kpi_5, _, kpi_6, _, kpi_7, _ = st.columns(
-        [0.75, 1, 0.10, 1, 0.10, 1, 0.75]
+    st.markdown(
+        '<div class="dashboard-space"></div>',
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # FILA 2
+    # --------------------------------------------------------
+
+    (
+        margen_izq,
+        kpi_5,
+        sep_1,
+        kpi_6,
+        sep_2,
+        kpi_7,
+        margen_der,
+    ) = st.columns(
+        [
+            0.75,
+            1,
+            0.10,
+            1,
+            0.10,
+            1,
+            0.75,
+        ]
     )
 
     with kpi_5:
+
         tarjeta_kpi(
             "Ejecutables",
-            f"{calcular_porcentaje(ejecutables_n, total_registros):.1f}%",
+            (
+                f"{calcular_porcentaje(ejecutables_n, total_registros):.1f}%"
+            ),
             f"{ejecutables_n:,}",
             "teal",
         )
+
     with kpi_6:
+
         tarjeta_kpi(
             "No ejecutables",
-            f"{calcular_porcentaje(no_ejecutables_n, total_registros):.1f}%",
+            (
+                f"{calcular_porcentaje(no_ejecutables_n, total_registros):.1f}%"
+            ),
             f"{no_ejecutables_n:,}",
             "red",
         )
+
     with kpi_7:
+
         tarjeta_kpi(
             "Escalados a proyectos",
             f"{escalados_n:,}",
@@ -752,36 +1231,111 @@ def dashboard(df: pd.DataFrame) -> None:
             "amber",
         )
 
-    st.markdown('<div class="dashboard-space"></div>', unsafe_allow_html=True)
+    # ========================================================
+    # ALERTAS
+    # ========================================================
 
-    # Alertas
-    alertas = st.columns(3, gap="medium")
-    with alertas[0].container(border=True):
+    st.markdown(
+        '<div class="dashboard-space"></div>',
+        unsafe_allow_html=True,
+    )
+
+    alertas = st.columns(
+        3,
+        gap="medium",
+    )
+
+    with alertas[0].container(
+        border=True,
+    ):
+
         if vencidos_n > 0:
-            st.markdown(":red-badge[Crítico]")
-            st.write(f"**{vencidos_n:,}** casos vencidos operativos requieren priorización.")
-        else:
-            st.markdown(":green-badge[Controlado]")
-            st.write("No existen casos vencidos operativos.")
 
-    with alertas[1].container(border=True):
+            st.markdown(
+                ":red-badge[Crítico]"
+            )
+
+            st.write(
+                f"**{vencidos_n:,}** "
+                f"casos vencidos operativos requieren "
+                f"priorización."
+            )
+
+        else:
+
+            st.markdown(
+                ":green-badge[Controlado]"
+            )
+
+            st.write(
+                "No existen casos vencidos "
+                "operativos."
+            )
+
+    with alertas[1].container(
+        border=True,
+    ):
+
         if proximos_n > 0:
-            st.markdown(":orange-badge[Atención]")
-            st.write(f"**{proximos_n:,}** casos operativos están próximos a vencer.")
+
+            st.markdown(
+                ":orange-badge[Atención]"
+            )
+
+            st.write(
+                f"**{proximos_n:,}** "
+                f"casos operativos están próximos a vencer."
+            )
+
         else:
-            st.markdown(":green-badge[Controlado]")
-            st.write("No existen casos próximos a vencer operativos.")
 
-    with alertas[2].container(border=True):
-        st.markdown(":blue-badge[Proyectos]")
-        st.write(f"**{escalados_n:,}** casos escalados a proyectos se gestionan fuera de la alerta operativa.")
+            st.markdown(
+                ":green-badge[Controlado]"
+            )
 
-    # Gráficos circulares
-    izquierda, derecha = st.columns(2, gap="medium")
+            st.write(
+                "No existen casos próximos a vencer "
+                "operativos."
+            )
 
-    with izquierda.container(border=True):
-        st.subheader("Estado de PQRSD", icon=":material/donut_small:")
+    with alertas[2].container(
+        border=True,
+    ):
+
+        st.markdown(
+            ":blue-badge[Proyectos]"
+        )
+
+        st.write(
+            f"**{escalados_n:,}** "
+            f"casos escalados a proyectos "
+            f"se gestionan fuera de la alerta operativa."
+        )
+
+    # ========================================================
+    # ESTADO PQRSD + VIABILIDAD
+    # ========================================================
+
+    izquierda, derecha = st.columns(
+        2,
+        gap="medium",
+    )
+
+    # --------------------------------------------------------
+    # ESTADO PQRSD
+    # --------------------------------------------------------
+
+    with izquierda.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Estado de PQRSD",
+            icon=":material/donut_small:",
+        )
+
         if "ESTADO PQRS CON PDR" in df.columns:
+
             fig = px.pie(
                 df,
                 names="ESTADO PQRS CON PDR",
@@ -794,13 +1348,33 @@ def dashboard(df: pd.DataFrame) -> None:
                     "VENCIDO": PALETTE["red"],
                 },
             )
-            st.plotly_chart(figura_base(fig), use_container_width=True)
-        else:
-            st.info("No se encontró la columna de estado PQRSD.")
 
-    with derecha.container(border=True):
-        st.subheader("Viabilidad de mantenimiento", icon=":material/build:")
+            st.plotly_chart(
+                figura_base(fig),
+                width="stretch",
+            )
+
+        else:
+
+            st.info(
+                "No se encontró la columna de estado PQRSD."
+            )
+
+    # --------------------------------------------------------
+    # VIABILIDAD
+    # --------------------------------------------------------
+
+    with derecha.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Viabilidad de mantenimiento",
+            icon=":material/build:",
+        )
+
         if "VIABILIDAD DE MTTO" in df.columns:
+
             fig = px.pie(
                 df,
                 names="VIABILIDAD DE MTTO",
@@ -811,34 +1385,422 @@ def dashboard(df: pd.DataFrame) -> None:
                     "NO EJECUTABLE": PALETTE["red"],
                 },
             )
-            st.plotly_chart(figura_base(fig), use_container_width=True)
+
+            st.plotly_chart(
+                figura_base(fig),
+                width="stretch",
+            )
+
         else:
-            st.info("No se encontró la columna de viabilidad.")
 
-    st.markdown("---")
-    
-    # Tabla de datos detallados
-    st.subheader("Detalle de Registros", icon=":material/table_view:")
-    st.dataframe(df, use_container_width=True)
+            st.info(
+                "No se encontró la columna de viabilidad."
+            )
 
+    # ========================================================
+    # ACCIÓN + VISITAS
+    # ========================================================
 
-# ============================================================
-# MAIN
-# ============================================================
+    izquierda, derecha = st.columns(
+        2,
+        gap="medium",
+    )
 
-def main() -> None:
-    df = cargar_roadmap()
+    # --------------------------------------------------------
+    # ACCIÓN REQUERIDA
+    # --------------------------------------------------------
 
-    if df.empty:
-        st.warning(
-            "Por favor, sube un archivo Excel válido a través del panel lateral "
-            "para visualizar el dashboard.",
-            icon=":material/warning:",
+    with izquierda.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Acción requerida",
+            icon=":material/task_alt:",
         )
-        return
 
-    dashboard(df)
+        col_accion = buscar_columna(
+            df,
+            [
+                "ACCIÓN",
+                "ACCION",
+                "ACCIÓN REQUERIDA",
+                "ACCION REQUERIDA",
+            ],
+        )
+
+        if col_accion:
+
+            acciones = limpiar_texto(
+                df[col_accion]
+            )
+
+            resumen_accion = (
+                acciones
+                .value_counts()
+                .sort_values()
+                .reset_index()
+            )
+
+            resumen_accion.columns = [
+                "Acción",
+                "Casos",
+            ]
+
+            fig = px.bar(
+                resumen_accion,
+                x="Casos",
+                y="Acción",
+                orientation="h",
+                text="Casos",
+                color_discrete_sequence=[
+                    PALETTE["blue"]
+                ],
+            )
+
+            fig.update_traces(
+                textposition="outside",
+                cliponaxis=False,
+            )
+
+            st.plotly_chart(
+                figura_base(
+                    fig,
+                    max(
+                        290,
+                        len(resumen_accion) * 42,
+                    ),
+                ),
+                width="stretch",
+            )
+
+        else:
+
+            st.info(
+                "No se encontró la columna ACCIÓN."
+            )
+
+    # --------------------------------------------------------
+    # PROGRAMACIÓN DE VISITAS
+    # --------------------------------------------------------
+
+    with derecha.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Programación de visitas",
+            icon=":material/event_available:",
+        )
+
+        visitas = (
+            df["_ESTADO_VISITA"]
+            .value_counts()
+            .sort_values()
+            .reset_index()
+        )
+
+        visitas.columns = [
+            "Estado",
+            "Casos",
+        ]
+
+        fig = px.bar(
+            visitas,
+            x="Casos",
+            y="Estado",
+            orientation="h",
+            text="Casos",
+            color="Estado",
+            color_discrete_map={
+                "Visita vencida": PALETTE["red"],
+                "Visita hoy": PALETTE["amber"],
+                "Visita programada": PALETTE["teal"],
+                "Visita programada - caso vencido": PALETTE["red"],
+                "Sin fecha": PALETTE["slate"],
+            },
+        )
+
+        fig.update_traces(
+            textposition="outside",
+            cliponaxis=False,
+        )
+
+        st.plotly_chart(
+            figura_base(
+                fig,
+                max(
+                    290,
+                    len(visitas) * 45,
+                ),
+            ),
+            width="stretch",
+        )
+
+    # ========================================================
+    # DEPARTAMENTO + BLOQUEOS
+    # ========================================================
+
+    izquierda, derecha = st.columns(
+        2,
+        gap="medium",
+    )
+
+    # --------------------------------------------------------
+    # DEPARTAMENTO
+    # --------------------------------------------------------
+
+    with izquierda.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Casos por departamento",
+            icon=":material/location_on:",
+        )
+
+        if "DEPARTAMENTO" in df.columns:
+
+            resumen = (
+                df["DEPARTAMENTO"]
+                .fillna("Sin departamento")
+                .astype(str)
+                .str.strip()
+                .value_counts()
+                .head(10)
+                .sort_values()
+                .reset_index()
+            )
+
+            resumen.columns = [
+                "Departamento",
+                "Casos",
+            ]
+
+            fig = px.bar(
+                resumen,
+                x="Casos",
+                y="Departamento",
+                orientation="h",
+                text="Casos",
+                color_discrete_sequence=[
+                    PALETTE["blue"]
+                ],
+            )
+
+            fig.update_traces(
+                textposition="outside",
+                cliponaxis=False,
+            )
+
+            st.plotly_chart(
+                figura_base(fig),
+                width="stretch",
+            )
+
+        else:
+
+            st.info(
+                "No se encontró la columna de departamento."
+            )
+
+    # --------------------------------------------------------
+    # BLOQUEOS
+    # --------------------------------------------------------
+
+    with derecha.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Principales bloqueos",
+            icon=":material/block:",
+        )
+
+        if {
+            "VIABILIDAD DE MTTO",
+            "NOVEDAD",
+        }.issubset(df.columns):
+
+            viabilidad_bloqueos = (
+                df["VIABILIDAD DE MTTO"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
+
+            bloqueos = df.loc[
+                viabilidad_bloqueos.eq(
+                    "NO EJECUTABLE"
+                ),
+                "NOVEDAD",
+            ]
+
+            resumen = (
+                bloqueos
+                .dropna()
+                .astype(str)
+                .str.strip()
+                .replace(
+                    "",
+                    "Sin información",
+                )
+                .value_counts()
+                .head(10)
+                .sort_values()
+                .reset_index()
+            )
+
+            resumen.columns = [
+                "Novedad",
+                "Casos",
+            ]
+
+            if resumen.empty:
+
+                st.success(
+                    "No hay bloqueos en los filtros seleccionados."
+                )
+
+            else:
+
+                fig = px.bar(
+                    resumen,
+                    x="Casos",
+                    y="Novedad",
+                    orientation="h",
+                    text="Casos",
+                    color_discrete_sequence=[
+                        PALETTE["red"]
+                    ],
+                )
+
+                fig.update_traces(
+                    textposition="outside",
+                    cliponaxis=False,
+                )
+
+                st.plotly_chart(
+                    figura_base(fig),
+                    width="stretch",
+                )
+
+        else:
+
+            st.info(
+                "No se encontraron las columnas "
+                "de viabilidad y novedad."
+            )
+
+    # ========================================================
+    # TABLA DETALLADA
+    # ========================================================
+
+    with st.container(
+        border=True,
+    ):
+
+        st.subheader(
+            "Dataframe",
+            icon=":material/table_chart:",
+        )
+
+        buscar = st.text_input(
+            "Buscar en la tabla",
+            placeholder=(
+                "Municipio, técnico, cédula o novedad..."
+            ),
+        )
+
+        columnas = [
+            "ALIADOS",
+            "ID BENEFICIARIO",
+            "DEPARTAMENTO",
+            "MUNICIPIO",
+            "PRIORIDAD",
+            "ESTADO PQRS CON PDR",
+            "ESTADO",
+            "ACCIÓN",
+            "VIABILIDAD DE MTTO",
+            "FECHA VISITA",
+            "TÉCNICO",
+            "NOVEDAD",
+        ]
+
+        columnas_disponibles = [
+            c
+            for c in columnas
+            if c in df.columns
+        ]
+
+        tabla = df[
+            columnas_disponibles
+        ].copy()
+
+        if buscar:
+
+            coincidencia = (
+                tabla
+                .astype(str)
+                .apply(
+                    lambda serie:
+                    serie.str.contains(
+                        buscar,
+                        case=False,
+                        na=False,
+                        regex=False,
+                    )
+                )
+                .any(axis=1)
+            )
+
+            tabla = tabla[
+                coincidencia
+            ]
+
+        st.dataframe(
+            tabla,
+            height=420,
+            width="stretch",
+            hide_index=True,
+        )
 
 
-if __name__ == "__main__":
-    main()
+# ============================================================
+# EJECUCIÓN
+# ============================================================
+
+st.sidebar.caption(
+    "Dashboard ejecutivo · RoadMap"
+)
+
+datos = cargar_roadmap()
+
+if datos.empty:
+
+    st.title(
+        "Dashboard ejecutivo",
+        icon=":material/monitoring:",
+    )
+
+    if ARCHIVO_GUARDADO.exists():
+
+        st.warning(
+            "No hay registros para la combinación "
+            "de filtros seleccionada."
+        )
+
+    else:
+
+        st.info(
+            "Carga un archivo Excel con la hoja "
+            "**RoadMap** para comenzar.",
+            icon=":material/upload:",
+        )
+
+else:
+
+    dashboard(
+        datos
+    )
