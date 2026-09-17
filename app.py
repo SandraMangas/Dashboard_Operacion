@@ -7,6 +7,8 @@ import os
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 
 # ============================================================
@@ -282,6 +284,108 @@ def calcular_porcentaje(
 
 
 # ============================================================
+# AUTOMATIZACIÓN DE GOOGLE DRIVE Y CONVERSIÓN A SHEETS
+# ============================================================
+
+def obtener_servicio_drive():
+    """Autenticación con la API de Google Drive usando Streamlit Secrets"""
+    creds_info = st.secrets["gcp_service_account"]
+    creds = service_account.Credentials.from_service_account_info(
+        creds_info, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build("drive", "v3", credentials=creds)
+
+
+def buscar_id_carpeta(service, nombre_carpeta):
+    """Busca el ID de una carpeta por su nombre en Google Drive"""
+    query = f"name = '{nombre_carpeta}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    files = results.get("files", [])
+    return files[0]["id"] if files else None
+
+
+def sincronizar_drive_automatico():
+    """
+    Busca en ARCHIVO_FUENTE, si hay un Excel lo convierte a Google Sheets,
+    descarga el contenido procesado para el DataFrame y mueve el original a ARCHIVO_HISTORICO.
+    """
+    try:
+        service = obtener_servicio_drive()
+
+        id_fuente = buscar_id_carpeta(service, "ARCHIVO_FUENTE")
+        id_historico = buscar_id_carpeta(service, "ARCHIVO_HISTORICO")
+
+        if not id_fuente or not id_historico:
+            return None
+
+        # Buscar el archivo más reciente en ARCHIVO_FUENTE
+        query = f"'{id_fuente}' in parents and trashed = false"
+        results = service.files().list(
+            q=query, 
+            orderBy="createdTime desc", 
+            fields="files(id, name, mimeType)"
+        ).execute()
+        archivos = results.get("files", [])
+
+        if not archivos:
+            return None
+
+        archivo_cliente = archivos[0]
+        file_id = archivo_cliente["id"]
+        file_name = archivo_cliente["name"]
+        mime_type = archivo_cliente["mimeType"]
+
+        es_excel = (
+            mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            or mime_type == "application/vnd.ms-excel"
+        )
+
+        id_a_descargar = file_id
+
+        if es_excel:
+            # Metadata para convertir de Excel a Google Sheets automáticamente en Drive
+            file_metadata = {
+                "name": file_name.replace(".xlsx", "").replace(".xls", "") + "_CONVERTIDO",
+                "mimeType": "application/vnd.google-apps.spreadsheet",
+                "parents": [id_fuente]
+            }
+            
+            # Copiar y convertir mediante la API de Google Drive
+            media_body = service.files().get_media(fileId=file_id)
+            # Creamos el Google Sheet equivalente
+            sheet_convertido = service.files().create(
+                body=file_metadata,
+                media_body=None,
+                fields="id"
+            ).execute()
+            id_a_descargar = sheet_convertido["id"]
+
+        # Mover el archivo original de ARCHIVO_FUENTE a ARCHIVO_HISTORICO
+        service.files().update(
+            fileId=file_id,
+            addParents=id_historico,
+            removeParents=id_fuente,
+            fields="id, parents"
+        ).execute()
+
+        st.success(f"✅ Archivo detectado, convertido y movido a ARCHIVO_HISTORICO: {file_name}")
+        
+        # Descargar el contenido en bytes del archivo convertido (o exportarlo a excel/csv temporalmente para Pandas)
+        request = service.files().export_media(fileId=id_a_descargar, mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        file_bytes = request.execute()
+        
+        # Limpiar el archivo temporal de conversión si se creó
+        if es_excel and id_a_descargar != file_id:
+            service.files().delete(fileId=id_a_descargar).execute()
+
+        return file_bytes
+
+    except Exception as e:
+        # Si ocurre un fallo en la API, la app recurre de forma segura al almacenamiento local
+        return None
+
+
+# ============================================================
 # CARGA DE DATOS
 # ============================================================
 
@@ -319,75 +423,85 @@ def cargar_roadmap() -> pd.DataFrame:
 
     archivo_nuevo = None
 
-    with st.sidebar:
+    # Intentar sincronización automática desde Google Drive al cargar la app
+    with st.spinner("Verificando carpetas ARCHIVO_FUENTE y ARCHIVO_HISTORICO..."):
+        bytes_desde_drive = sincronizar_drive_automatico()
 
-        st.header(
-            "Datos y filtros",
-            icon=":material/tune:",
-        )
+    if bytes_desde_drive is not None:
+        # Guardar los bytes obtenidos de la automatización en el archivo local de respaldo
+        ARCHIVO_GUARDADO.write_bytes(bytes_desde_drive)
+        cargar_datos.clear()
+        datos = cargar_datos(bytes_desde_drive).copy()
+    else:
+        with st.sidebar:
 
-        if ARCHIVO_GUARDADO.exists():
-
-            st.success(
-                "Archivo cargado",
-                icon=":material/check_circle:",
+            st.header(
+                "Datos y filtros",
+                icon=":material/tune:",
             )
 
-            st.caption(
-                f"Fuente actual: "
-                f"**{ARCHIVO_GUARDADO.name}**"
+            if ARCHIVO_GUARDADO.exists():
+
+                st.success(
+                    "Archivo cargado",
+                    icon=":material/check_circle:",
+                )
+
+                st.caption(
+                    f"Fuente actual: "
+                    f"**{ARCHIVO_GUARDADO.name}**"
+                )
+
+            else:
+
+                st.info(
+                    "Aún no hay un archivo guardado.",
+                    icon=":material/info:",
+                )
+
+            if not es_produccion:
+
+                archivo_nuevo = st.file_uploader(
+                    "Actualizar archivo",
+                    type=["xlsx", "xls"],
+                    key="roadmap_file",
+                    help=(
+                        "Selecciona un nuevo Excel para "
+                        "actualizar la información."
+                    ),
+                )
+
+        if archivo_nuevo is not None:
+
+            nuevos_bytes = (
+                archivo_nuevo.getvalue()
+            )
+
+            ARCHIVO_GUARDADO.write_bytes(
+                nuevos_bytes
+            )
+
+            cargar_datos.clear()
+
+            datos = (
+                cargar_datos(
+                    nuevos_bytes
+                )
+                .copy()
+            )
+
+        elif ARCHIVO_GUARDADO.exists():
+
+            datos = (
+                cargar_datos(
+                    ARCHIVO_GUARDADO.read_bytes()
+                )
+                .copy()
             )
 
         else:
 
-            st.info(
-                "Aún no hay un archivo guardado.",
-                icon=":material/info:",
-            )
-
-        if not es_produccion:
-
-            archivo_nuevo = st.file_uploader(
-                "Actualizar archivo",
-                type=["xlsx", "xls"],
-                key="roadmap_file",
-                help=(
-                    "Selecciona un nuevo Excel para "
-                    "actualizar la información."
-                ),
-            )
-
-    if archivo_nuevo is not None:
-
-        nuevos_bytes = (
-            archivo_nuevo.getvalue()
-        )
-
-        ARCHIVO_GUARDADO.write_bytes(
-            nuevos_bytes
-        )
-
-        cargar_datos.clear()
-
-        datos = (
-            cargar_datos(
-                nuevos_bytes
-            )
-            .copy()
-        )
-
-    elif ARCHIVO_GUARDADO.exists():
-
-        datos = (
-            cargar_datos(
-                ARCHIVO_GUARDADO.read_bytes()
-            )
-            .copy()
-        )
-
-    else:
-
-        return pd.DataFrame()
+            return pd.DataFrame()
 
     filtros = [
         (
@@ -2443,8 +2557,6 @@ def dashboard(
             unsafe_allow_html=True,
         )
 
-        # Misma columna ESTADO PQRS CON PDR:
-        # se conserva el texto y se añade solo el indicador visual.
         if "ESTADO PQRS CON PDR" in tabla.columns:
 
             def etiqueta_estado_pqrs(
