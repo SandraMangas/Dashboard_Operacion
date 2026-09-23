@@ -7,7 +7,8 @@ import os
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 
@@ -284,104 +285,136 @@ def calcular_porcentaje(
 
 
 # ============================================================
-# AUTOMATIZACIÓN DE GOOGLE DRIVE Y CONVERSIÓN A SHEETS
+# AUTOMATIZACIÓN DE GOOGLE DRIVE CON OAUTH 2.0
 # ============================================================
 
+GOOGLE_DRIVE_DIR = (
+    BASE_DIR
+    / "prueba_google_drive"
+)
+
+TOKEN_FILE = (
+    GOOGLE_DRIVE_DIR
+    / "token.json"
+)
+
+SOURCE_FOLDER_ID = (
+    "1JY5ghG7B8DZj2GCRrnwV3hO7HtLSWB6e"
+)
+
+SCOPES = [
+    "https://www.googleapis.com/auth/drive"
+]
+
+
 def obtener_servicio_drive():
-    """Autenticación con la API de Google Drive usando Streamlit Secrets"""
-    creds_info = st.secrets["gcp_service_account"]
-    creds = service_account.Credentials.from_service_account_info(
-        creds_info, scopes=["https://www.googleapis.com/auth/drive"]
+    """
+    Autenticación con Google Drive mediante OAuth 2.0.
+
+    Utiliza el token persistente generado durante
+    las pruebas de Google Drive.
+    """
+
+    if not TOKEN_FILE.exists():
+        raise FileNotFoundError(
+            f"No se encontró token.json en: {TOKEN_FILE}"
+        )
+
+    credentials = Credentials.from_authorized_user_file(
+        str(TOKEN_FILE),
+        SCOPES,
     )
-    return build("drive", "v3", credentials=creds)
 
+    if (
+        credentials.expired
+        and credentials.refresh_token
+    ):
+        credentials.refresh(Request())
 
-def buscar_id_carpeta(service, nombre_carpeta):
-    """Busca el ID de una carpeta por su nombre en Google Drive"""
-    query = f"name = '{nombre_carpeta}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    results = service.files().list(q=query, fields="files(id, name)").execute()
-    files = results.get("files", [])
-    return files[0]["id"] if files else None
+        TOKEN_FILE.write_text(
+            credentials.to_json(),
+            encoding="utf-8",
+        )
+
+    if not credentials.valid:
+        raise RuntimeError(
+            "El token de Google Drive no es válido."
+        )
+
+    return build(
+        "drive",
+        "v3",
+        credentials=credentials,
+    )
 
 
 def sincronizar_drive_automatico():
     """
-    Busca en ARCHIVO_FUENTE, si hay un Excel lo convierte a Google Sheets,
-    descarga el contenido procesado para el DataFrame y mueve el original a ARCHIVO_HISTORICO.
+    Busca el Excel más reciente en ARCHIVO_FUENTE
+    y lo descarga en memoria.
+
+    Esta función NO:
+    - mueve archivos;
+    - convierte archivos a Google Sheets;
+    - crea copias;
+    - elimina archivos.
+
+    Devuelve los bytes del Excel o None si ocurre
+    un error.
     """
+
     try:
+
         service = obtener_servicio_drive()
 
-        id_fuente = buscar_id_carpeta(service, "ARCHIVO_FUENTE")
-        id_historico = buscar_id_carpeta(service, "ARCHIVO_HISTORICO")
+        query = (
+            f"'{SOURCE_FOLDER_ID}' in parents "
+            f"and trashed = false "
+            f"and mimeType = "
+            f"'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+        )
 
-        if not id_fuente or not id_historico:
-            return None
-
-        # Buscar el archivo más reciente en ARCHIVO_FUENTE
-        query = f"'{id_fuente}' in parents and trashed = false"
-        results = service.files().list(
-            q=query, 
-            orderBy="createdTime desc", 
-            fields="files(id, name, mimeType)"
+        resultado = service.files().list(
+            q=query,
+            pageSize=10,
+            orderBy="modifiedTime desc",
+            fields=(
+                "files("
+                "id,"
+                "name,"
+                "mimeType,"
+                "modifiedTime,"
+                "size"
+                ")"
+            ),
         ).execute()
-        archivos = results.get("files", [])
+
+        archivos = resultado.get(
+            "files",
+            [],
+        )
 
         if not archivos:
             return None
 
-        archivo_cliente = archivos[0]
-        file_id = archivo_cliente["id"]
-        file_name = archivo_cliente["name"]
-        mime_type = archivo_cliente["mimeType"]
+        archivo = archivos[0]
 
-        es_excel = (
-            mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            or mime_type == "application/vnd.ms-excel"
+        file_id = archivo["id"]
+
+        request = service.files().get_media(
+            fileId=file_id,
         )
 
-        id_a_descargar = file_id
-
-        if es_excel:
-            # Metadata para convertir de Excel a Google Sheets automáticamente en Drive
-            file_metadata = {
-                "name": file_name.replace(".xlsx", "").replace(".xls", "") + "_CONVERTIDO",
-                "mimeType": "application/vnd.google-apps.spreadsheet",
-                "parents": [id_fuente]
-            }
-            
-            # Copiar y convertir mediante la API de Google Drive
-            media_body = service.files().get_media(fileId=file_id)
-            # Creamos el Google Sheet equivalente
-            sheet_convertido = service.files().create(
-                body=file_metadata,
-                media_body=None,
-                fields="id"
-            ).execute()
-            id_a_descargar = sheet_convertido["id"]
-
-        # Mover el archivo original de ARCHIVO_FUENTE a ARCHIVO_HISTORICO
-        service.files().update(
-            fileId=file_id,
-            addParents=id_historico,
-            removeParents=id_fuente,
-            fields="id, parents"
-        ).execute()
-
-        st.success(f"✅ Archivo detectado, convertido y movido a ARCHIVO_HISTORICO: {file_name}")
-        
-        # Descargar el contenido en bytes del archivo convertido (o exportarlo a excel/csv temporalmente para Pandas)
-        request = service.files().export_media(fileId=id_a_descargar, mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         file_bytes = request.execute()
-        
-        # Limpiar el archivo temporal de conversión si se creó
-        if es_excel and id_a_descargar != file_id:
-            service.files().delete(fileId=id_a_descargar).execute()
 
         return file_bytes
 
     except Exception as e:
-        # Si ocurre un fallo en la API, la app recurre de forma segura al almacenamiento local
+
+        print(
+            f"Error sincronizando Google Drive: {e}"
+        )
+
         return None
 
 
@@ -423,16 +456,31 @@ def cargar_roadmap() -> pd.DataFrame:
 
     archivo_nuevo = None
 
-    # Intentar sincronización automática desde Google Drive al cargar la app
-    with st.spinner("Verificando carpetas ARCHIVO_FUENTE y ARCHIVO_HISTORICO..."):
+    # Intentar sincronización automática desde Google Drive
+    with st.spinner(
+        "Verificando el Excel más reciente en Google Drive..."
+    ):
         bytes_desde_drive = sincronizar_drive_automatico()
 
     if bytes_desde_drive is not None:
-        # Guardar los bytes obtenidos de la automatización en el archivo local de respaldo
-        ARCHIVO_GUARDADO.write_bytes(bytes_desde_drive)
+
+        # Guardar los bytes obtenidos de Google Drive
+        # en el archivo local de respaldo
+        ARCHIVO_GUARDADO.write_bytes(
+            bytes_desde_drive
+        )
+
         cargar_datos.clear()
-        datos = cargar_datos(bytes_desde_drive).copy()
+
+        datos = (
+            cargar_datos(
+                bytes_desde_drive
+            )
+            .copy()
+        )
+
     else:
+
         with st.sidebar:
 
             st.header(

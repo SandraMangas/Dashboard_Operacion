@@ -12,3 +12,7 @@ venv/
 *.xlsx
 *.xls
 *.csv
+
+# Credenciales Google Drive
+prueba_google_drive/token.json
+prueba_google_drive/client_secret*.json
