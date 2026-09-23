@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from pathlib import Path
+import json
 import os
 
 import pandas as pd
@@ -311,32 +312,122 @@ def obtener_servicio_drive():
     """
     Autenticación con Google Drive mediante OAuth 2.0.
 
-    Utiliza el token persistente generado durante
-    las pruebas de Google Drive.
+    LOCAL:
+        Usa prueba_google_drive/token.json
+
+    STREAMLIT CLOUD:
+        Usa el token almacenado en Streamlit Secrets.
+
+    El resto de la lógica del dashboard no cambia.
     """
 
-    if not TOKEN_FILE.exists():
-        raise FileNotFoundError(
-            f"No se encontró token.json en: {TOKEN_FILE}"
+    # ========================================================
+    # STREAMLIT CLOUD: BUSCAR TOKEN EN SECRETS
+    # ========================================================
+
+    token_secrets = None
+
+    try:
+
+        token_secrets = (
+            st.secrets[
+                "google_drive"
+            ][
+                "token_json"
+            ]
         )
 
-    credentials = Credentials.from_authorized_user_file(
-        str(TOKEN_FILE),
-        SCOPES,
-    )
+    except (
+        KeyError,
+        FileNotFoundError,
+    ):
+
+        token_secrets = None
+
+    # ========================================================
+    # SI EXISTE EL SECRET, USARLO
+    # ========================================================
+
+    if token_secrets:
+
+        try:
+
+            if isinstance(
+                token_secrets,
+                str,
+            ):
+
+                token_info = json.loads(
+                    token_secrets
+                )
+
+            else:
+
+                token_info = dict(
+                    token_secrets
+                )
+
+            credentials = (
+                Credentials.from_authorized_user_info(
+                    token_info,
+                    SCOPES,
+                )
+            )
+
+        except Exception as e:
+
+            raise RuntimeError(
+                "No se pudo cargar el token de "
+                "Google Drive desde Streamlit Secrets."
+            ) from e
+
+    # ========================================================
+    # EJECUCIÓN LOCAL: USAR token.json
+    # ========================================================
+
+    else:
+
+        if not TOKEN_FILE.exists():
+
+            raise FileNotFoundError(
+                f"No se encontró token.json en: {TOKEN_FILE}"
+            )
+
+        credentials = (
+            Credentials.from_authorized_user_file(
+                str(TOKEN_FILE),
+                SCOPES,
+            )
+        )
+
+    # ========================================================
+    # REFRESCAR CREDENCIALES
+    # ========================================================
 
     if (
         credentials.expired
         and credentials.refresh_token
     ):
-        credentials.refresh(Request())
 
-        TOKEN_FILE.write_text(
-            credentials.to_json(),
-            encoding="utf-8",
+        credentials.refresh(
+            Request()
         )
 
+        # Solo guardar el token actualizado
+        # cuando estamos trabajando localmente.
+        if not token_secrets:
+
+            TOKEN_FILE.write_text(
+                credentials.to_json(),
+                encoding="utf-8",
+            )
+
+    # ========================================================
+    # VALIDAR CREDENCIALES
+    # ========================================================
+
     if not credentials.valid:
+
         raise RuntimeError(
             "El token de Google Drive no es válido."
         )
