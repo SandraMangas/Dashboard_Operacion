@@ -2609,7 +2609,7 @@ def dashboard(
         buscar = st.text_input(
             "Buscar en la tabla",
             placeholder=(
-                "Municipio, técnico, cédula o novedad..."
+                "Aliados, ID, Departamento, novedad..."
             ),
         )
 
