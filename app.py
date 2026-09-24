@@ -2261,7 +2261,7 @@ def dashboard(
                 )
 
                 st.caption(
-                    f"Total sitios únicos escalados a proyectos: "
+                    f"Total sitios escalados a proyectos: "
                     f"{total_sitios_escalados:,}"
                 )
 
